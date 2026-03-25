@@ -7,6 +7,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
@@ -15,14 +16,14 @@ import type { WorkingCapitalData, WorkingCapitalResults } from "@/lib/calculatio
 import { parseFinancialDocument, FORMAT_LABEL } from "@/lib/parseViaApi";
 import { exportWorkingCapitalPDF } from "@/lib/pdfExport";
 import { useCreateCase } from "@workspace/api-client-react";
-import { PageBackground, PageHeader, TabNavBar } from "@/components/UI";
+import { PageBackground, PageHeader, GlassCard, UploadZone, GradientButton, CardTitle, TabNavBar } from "@/components/UI";
 
 const C = Colors.light;
 
 const BS_FIELDS: { key: keyof WorkingCapitalData; label: string }[] = [
   { key: "currentAssets",      label: "Current Assets" },
   { key: "currentLiabilities", label: "Current Liabilities" },
-  { key: "inventory",          label: "Inventory" },
+  { key: "inventory",          label: "Inventory / Stock" },
   { key: "debtors",            label: "Debtors / Receivables" },
   { key: "creditors",          label: "Creditors / Payables" },
   { key: "cash",               label: "Cash & Bank Balance" },
@@ -33,13 +34,10 @@ const PL_FIELDS: { key: keyof WorkingCapitalData; label: string }[] = [
   { key: "cogs",       label: "Cost of Goods Sold" },
   { key: "purchases",  label: "Purchases" },
   { key: "expenses",   label: "Operating Expenses" },
-  { key: "netProfit",  label: "Net Profit" },
+  { key: "netProfit",  label: "Net Profit / PAT" },
 ];
 
-const INR = (n?: number) =>
-  n !== undefined ? "₹" + Math.abs(n).toLocaleString("en-IN") : "—";
-
-// ─────────────────────────────────────────────────────────────────────────────
+const INR = (n?: number) => n !== undefined ? "₹" + Math.abs(n).toLocaleString("en-IN") : "—";
 
 type UploadSlot = { name: string; format: string } | null;
 
@@ -48,16 +46,17 @@ export default function WorkingCapitalScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const createCase = useCreateCase();
 
-  const [data, setData] = useState<WorkingCapitalData>({});
-  const [results, setResults] = useState<WorkingCapitalResults | null>(null);
+  const [data, setData]         = useState<WorkingCapitalData>({});
+  const [results, setResults]   = useState<WorkingCapitalResults | null>(null);
   const [bsParsing, setBsParsing] = useState(false);
   const [plParsing, setPlParsing] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [bsSlot, setBsSlot] = useState<UploadSlot>(null);
-  const [plSlot, setPlSlot] = useState<UploadSlot>(null);
+  const [saving, setSaving]     = useState(false);
+  const [bsSlot, setBsSlot]     = useState<UploadSlot>(null);
+  const [plSlot, setPlSlot]     = useState<UploadSlot>(null);
   const [saveModal, setSaveModal] = useState(false);
   const [clientName, setClientName] = useState("");
+  const [showInputs, setShowInputs] = useState(false);
 
   const set = (key: keyof WorkingCapitalData, val: string) => {
     const num = parseFloat(val.replace(/,/g, "")) || 0;
@@ -67,47 +66,35 @@ export default function WorkingCapitalScreen() {
   const pickAndParse = async (section: "bs" | "pl") => {
     const setParsing = section === "bs" ? setBsParsing : setPlParsing;
     const setSlot    = section === "bs" ? setBsSlot    : setPlSlot;
-
-    // Fields relevant to each section
     const bsKeys: (keyof WorkingCapitalData)[] = ["currentAssets","currentLiabilities","inventory","debtors","creditors","cash"];
     const plKeys: (keyof WorkingCapitalData)[] = ["sales","cogs","purchases","expenses","netProfit"];
     const relevantKeys = section === "bs" ? bsKeys : plKeys;
 
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["*/*"],
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
+      const result = await DocumentPicker.getDocumentAsync({ type: ["*/*"], copyToCacheDirectory: true, multiple: false });
       if (result.canceled) return;
       const asset = result.assets[0];
-
       setParsing(true);
       let merged: Partial<WorkingCapitalData> = {};
-
       try {
-        // Use server-side structured parser — same accuracy as the web app
         const docType = section === "bs" ? "balance_sheet" : "profit_loss";
         const parsed = await parseFinancialDocument(asset.uri, asset.name, asset.mimeType ?? undefined, docType);
-        const fields = parsed.fields as Partial<WorkingCapitalData>;
+        const fields = parsed.fields as any;
         for (const key of relevantKeys) {
-          if ((fields as any)[key] !== undefined) merged[key] = (fields as any)[key];
+          if (fields[key] !== undefined) merged[key] = fields[key];
         }
         setSlot({ name: asset.name, format: FORMAT_LABEL[parsed.format] });
       } catch {
-        Alert.alert("Parse Error", "Could not read the file. Please enter values manually.");
+        Alert.alert("Parse Error", "Could not read the file. Enter values manually.");
         setParsing(false);
         return;
       }
-
       if (Object.keys(merged).length > 0) {
         setData((d) => ({ ...d, ...merged }));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
-        Alert.alert(
-          "No Data Found",
-          `Could not extract ${section === "bs" ? "Balance Sheet" : "P&L"} values automatically. Please enter values manually.`
-        );
+        Alert.alert("No Data Found", "Could not extract values. You can enter them manually below.");
+        setShowInputs(true);
       }
     } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -124,332 +111,300 @@ export default function WorkingCapitalScreen() {
   const handleExportPDF = async () => {
     if (!results) return;
     setExporting(true);
-    try {
-      await exportWorkingCapitalPDF(clientName || "Client", data, results);
-    } catch {
-      Alert.alert("Export Failed", "Could not generate PDF. Please try again.");
-    } finally {
-      setExporting(false);
-    }
+    try { await exportWorkingCapitalPDF(clientName || "Client", data, results); }
+    catch { Alert.alert("Export Failed", "Could not generate PDF."); }
+    finally { setExporting(false); }
   };
 
   const handleSave = async () => {
-    if (!clientName.trim()) {
-      Alert.alert("Client Name Required", "Enter a client name to save this case.");
-      return;
-    }
-    if (!results) {
-      Alert.alert("Calculate First", "Run the calculation before saving.");
-      return;
-    }
+    if (!clientName.trim()) { Alert.alert("Client Name Required", "Enter a client name to save."); return; }
+    if (!results) { Alert.alert("Calculate First", "Run the calculation before saving."); return; }
     setSaving(true);
     try {
       await createCase.mutateAsync({
-        clientName: clientName.trim(),
-        caseType: "working_capital",
-        workingCapitalData: data as any,
-        workingCapitalResults: results as any,
+        clientName: clientName.trim(), caseType: "working_capital",
+        workingCapitalData: data as any, workingCapitalResults: results as any,
       } as any);
       setSaveModal(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Saved", "Case saved successfully.");
-    } catch {
-      Alert.alert("Save Failed", "Could not save the case.");
-    } finally {
-      setSaving(false);
-    }
+    } catch { Alert.alert("Save Failed", "Could not save the case."); }
+    finally { setSaving(false); }
   };
 
   const wc = results?.workingCapitalAmount ?? 0;
+  const hasData = Object.values(data).some((v) => v && v > 0);
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <PageBackground>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16, paddingBottom: tabBarHeight + 24 }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <PageHeader
-          title="Working Capital"
-          subtitle="Balance Sheet & Profit & Loss Analysis"
-          accentColor={C.secondary}
-        />
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16, paddingBottom: tabBarHeight + 24 }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <PageHeader title="Working Capital" subtitle="Balance Sheet & Profit & Loss Analysis" accentColor={C.secondary} />
 
-        {/* ── Upload: Balance Sheet ─────────────────────────────────────── */}
-        <View style={styles.uploadSection}>
-          <View style={styles.uploadSectionHeader}>
-            <View style={[styles.uploadDot, { backgroundColor: C.secondary }]} />
-            <Text style={styles.uploadSectionTitle}>Balance Sheet</Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.uploadBtn, bsSlot && styles.uploadBtnDone]}
-            onPress={() => pickAndParse("bs")}
-            activeOpacity={0.8}
-            disabled={bsParsing}
-          >
-            {bsParsing ? (
-              <ActivityIndicator color={C.secondary} size="small" />
-            ) : bsSlot ? (
-              <Feather name="check-circle" size={16} color={C.success} />
-            ) : (
-              <Feather name="upload" size={16} color={C.secondary} />
-            )}
-            <Text style={[styles.uploadText, bsSlot && { color: C.text }]} numberOfLines={1}>
-              {bsParsing ? "Parsing…" : bsSlot ? bsSlot.name : "Upload Balance Sheet (PDF / Excel / Image)"}
-            </Text>
-            {bsSlot && (
-              <TouchableOpacity onPress={() => { setBsSlot(null); }} hitSlop={8}>
-                <Feather name="x" size={14} color={C.textSecondary} />
-              </TouchableOpacity>
-            )}
-          </TouchableOpacity>
-          {bsSlot && (
-            <Text style={styles.formatChip}>{bsSlot.format} — Current Assets, Liabilities, Debtors, Creditors extracted</Text>
-          )}
-        </View>
-
-        {/* ── Upload: Profit & Loss ─────────────────────────────────────── */}
-        <View style={styles.uploadSection}>
-          <View style={styles.uploadSectionHeader}>
-            <View style={[styles.uploadDot, { backgroundColor: C.primary }]} />
-            <Text style={styles.uploadSectionTitle}>Profit & Loss</Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.uploadBtn, plSlot && styles.uploadBtnDone]}
-            onPress={() => pickAndParse("pl")}
-            activeOpacity={0.8}
-            disabled={plParsing}
-          >
-            {plParsing ? (
-              <ActivityIndicator color={C.primary} size="small" />
-            ) : plSlot ? (
-              <Feather name="check-circle" size={16} color={C.success} />
-            ) : (
-              <Feather name="upload" size={16} color={C.primary} />
-            )}
-            <Text style={[styles.uploadText, plSlot && { color: C.text }]} numberOfLines={1}>
-              {plParsing ? "Parsing…" : plSlot ? plSlot.name : "Upload P&L Statement (PDF / Excel / Image)"}
-            </Text>
-            {plSlot && (
-              <TouchableOpacity onPress={() => { setPlSlot(null); }} hitSlop={8}>
-                <Feather name="x" size={14} color={C.textSecondary} />
-              </TouchableOpacity>
-            )}
-          </TouchableOpacity>
-          {plSlot && (
-            <Text style={styles.formatChip}>{plSlot.format} — Sales, Expenses, Net Profit extracted</Text>
-          )}
-        </View>
-
-        {/* ── Balance Sheet Fields ────────────────────────────────────── */}
-        <SectionCard title="Balance Sheet" color={C.secondary}>
-          {BS_FIELDS.map((f) => (
-            <InputRow key={f.key} label={f.label}
-              value={data[f.key] ? String(data[f.key]) : ""}
-              onChangeText={(v) => set(f.key, v)} />
-          ))}
-        </SectionCard>
-
-        {/* ── P&L Fields ────────────────────────────────────────────── */}
-        <SectionCard title="Profit & Loss" color={C.primary}>
-          {PL_FIELDS.map((f) => (
-            <InputRow key={f.key} label={f.label}
-              value={data[f.key] ? String(data[f.key]) : ""}
-              onChangeText={(v) => set(f.key, v)} />
-          ))}
-        </SectionCard>
-
-        {/* Calculate */}
-        <TouchableOpacity style={styles.calcBtn} onPress={handleCalculate} activeOpacity={0.85}>
-          <Feather name="cpu" size={18} color="#fff" />
-          <Text style={styles.calcBtnText}>Calculate Ratios</Text>
-        </TouchableOpacity>
-
-        {/* Results */}
-        {results && (
-          <>
-            <View style={styles.resultRow}>
-              <ResultCard label="Eligibility Amount" value={INR(results.eligibilityAmount)} color={C.primary} />
-              <ResultCard label="Net Working Capital" value={INR(results.workingCapitalAmount)} color={wc >= 0 ? C.success : C.danger} />
-            </View>
-
-            <View style={styles.grid}>
-              <RatioTile label="Current Ratio" value={(results.currentRatio ?? 0).toFixed(2) + "x"} good={(results.currentRatio ?? 0) >= 1.33} />
-              <RatioTile label="Quick Ratio"   value={(results.quickRatio ?? 0).toFixed(2) + "x"}   good={(results.quickRatio ?? 0) >= 1} />
-              <RatioTile label="Inv. Turnover" value={(results.inventoryTurnover ?? 0).toFixed(2) + "x"} good={(results.inventoryTurnover ?? 0) >= 4} />
-              <RatioTile label="Debtor Days"   value={(results.debtorDays ?? 0).toFixed(0) + "d"}   good={(results.debtorDays ?? 999) <= 90} />
-              <RatioTile label="Creditor Days" value={(results.creditorDays ?? 0).toFixed(0) + "d"} neutral />
-              <RatioTile label="WC Cycle"      value={(results.workingCapitalCycle ?? 0).toFixed(0) + "d"} good={(results.workingCapitalCycle ?? 999) < 60} />
-            </View>
-
-            {results.grossProfitMargin !== undefined && (
-              <View style={styles.resultRow}>
-                <ResultCard label="Gross Margin" value={(results.grossProfitMargin ?? 0).toFixed(1) + "%"} color={(results.grossProfitMargin ?? 0) >= 20 ? C.success : C.warning} />
-                <ResultCard label="Net Margin"   value={(results.netProfitMargin ?? 0).toFixed(1) + "%"}   color={(results.netProfitMargin ?? 0) >= 10 ? C.success : C.warning} />
+          {/* ── Step 1: Upload Documents ──────────────────────────── */}
+          <StepCard step={1} title="Upload Documents" subtitle="Select your financial documents — values are auto-extracted">
+            <UploadZone
+              onPress={() => pickAndParse("bs")}
+              loading={bsParsing}
+              uploaded={!!bsSlot}
+              fileName={bsSlot?.name}
+              label="Balance Sheet (PDF / Excel / Image)"
+              accentColor={C.secondary}
+              onClear={() => { setBsSlot(null); setData((d) => ({ ...d, currentAssets: undefined, currentLiabilities: undefined, inventory: undefined, debtors: undefined, creditors: undefined, cash: undefined })); setResults(null); }}
+            />
+            <View style={styles.uploadGap} />
+            <UploadZone
+              onPress={() => pickAndParse("pl")}
+              loading={plParsing}
+              uploaded={!!plSlot}
+              fileName={plSlot?.name}
+              label="P&L Statement (PDF / Excel / Image)"
+              accentColor={C.primary}
+              onClear={() => { setPlSlot(null); setData((d) => ({ ...d, sales: undefined, cogs: undefined, purchases: undefined, expenses: undefined, netProfit: undefined })); setResults(null); }}
+            />
+            {(bsSlot || plSlot) && (
+              <View style={styles.parsedChip}>
+                <Feather name="check-circle" size={12} color={C.success} />
+                <Text style={styles.parsedText}>
+                  {[bsSlot && "Balance Sheet", plSlot && "P&L"].filter(Boolean).join(" + ")} parsed — values auto-filled
+                </Text>
               </View>
             )}
+          </StepCard>
 
-            <View style={styles.actionRow}>
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: C.card, borderColor: C.border }]}
-                onPress={() => setSaveModal(true)} activeOpacity={0.8}>
-                <Feather name="save" size={16} color={C.primary} />
-                <Text style={[styles.actionBtnText, { color: C.primary }]}>Save Case</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: C.card, borderColor: C.border }]}
-                onPress={handleExportPDF} activeOpacity={0.8} disabled={exporting}>
-                {exporting ? <ActivityIndicator size="small" color={C.secondary} /> : <Feather name="download" size={16} color={C.secondary} />}
-                <Text style={[styles.actionBtnText, { color: C.secondary }]}>Export PDF</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
-        <TabNavBar current="index" />
-      </ScrollView>
-
-      {/* Save Modal */}
-      <Modal visible={saveModal} transparent animationType="slide" onRequestClose={() => setSaveModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Save Case</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Client / Company Name"
-              placeholderTextColor={C.textSecondary}
-              value={clientName}
-              onChangeText={setClientName}
-              autoFocus
+          {/* ── Step 2: Calculate ─────────────────────────────────── */}
+          <StepCard step={2} title="Calculate Working Capital" subtitle="Tap to run ratio analysis using extracted or entered values">
+            <GradientButton
+              onPress={handleCalculate}
+              label="Calculate Working Capital"
+              icon="cpu"
+              colors={[C.secondary, "#1890A8"]}
             />
-            <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSaveModal(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleSave} disabled={saving}>
-                {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalSaveText}>Save</Text>}
-              </TouchableOpacity>
-            </View>
+            {!hasData && (
+              <Text style={styles.hintText}>
+                Upload documents above for auto-fill, or tap "Enter Manually" to type values.
+              </Text>
+            )}
+            <TouchableOpacity
+              style={styles.manualToggle}
+              onPress={() => setShowInputs((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Feather name={showInputs ? "chevron-up" : "edit-2"} size={13} color={C.primary} />
+              <Text style={styles.manualToggleText}>
+                {showInputs ? "Hide manual inputs" : "Enter / review values manually"}
+              </Text>
+            </TouchableOpacity>
+          </StepCard>
+
+          {/* ── Manual Input Fields (collapsible) ────────────────── */}
+          {showInputs && (
+            <>
+              <GlassCard accentColor={C.secondary}>
+                <CardTitle>Balance Sheet Values</CardTitle>
+                {BS_FIELDS.map((f) => (
+                  <InputRow key={f.key} label={f.label}
+                    value={data[f.key] ? String(data[f.key]) : ""}
+                    onChangeText={(v) => set(f.key, v)} />
+                ))}
+              </GlassCard>
+
+              <GlassCard accentColor={C.primary}>
+                <CardTitle>Profit & Loss Values</CardTitle>
+                {PL_FIELDS.map((f) => (
+                  <InputRow key={f.key} label={f.label}
+                    value={data[f.key] ? String(data[f.key]) : ""}
+                    onChangeText={(v) => set(f.key, v)} />
+                ))}
+              </GlassCard>
+            </>
+          )}
+
+          {/* ── Step 3: Results ───────────────────────────────────── */}
+          {results && (
+            <>
+              <StepCard step={3} title="Analysis Results" subtitle="Working capital ratios and eligibility">
+                {/* Big eligibility card */}
+                <LinearGradient
+                  colors={[C.primary + "22", "#152236"]}
+                  style={styles.eligCard}
+                >
+                  <Text style={styles.eligLabel}>WC Loan Eligibility</Text>
+                  <Text style={[styles.eligAmount, { color: C.primary }]}>{INR(results.eligibilityAmount)}</Text>
+                  <Text style={styles.eligSub}>Net Working Capital: {INR(results.workingCapitalAmount)}</Text>
+                </LinearGradient>
+
+                {/* Ratio grid */}
+                <View style={styles.ratioGrid}>
+                  <RatioTile label="Current Ratio"   value={(results.currentRatio ?? 0).toFixed(2) + "x"} good={(results.currentRatio ?? 0) >= 1.33} />
+                  <RatioTile label="Quick Ratio"     value={(results.quickRatio ?? 0).toFixed(2) + "x"}   good={(results.quickRatio ?? 0) >= 1} />
+                  <RatioTile label="Inv. Turnover"   value={(results.inventoryTurnover ?? 0).toFixed(2) + "x"} good={(results.inventoryTurnover ?? 0) >= 4} />
+                  <RatioTile label="Debtor Days"     value={(results.debtorDays ?? 0).toFixed(0) + " d"} good={(results.debtorDays ?? 999) <= 90} />
+                  <RatioTile label="Creditor Days"   value={(results.creditorDays ?? 0).toFixed(0) + " d"} neutral />
+                  <RatioTile label="WC Cycle"        value={(results.workingCapitalCycle ?? 0).toFixed(0) + " d"} good={(results.workingCapitalCycle ?? 999) < 60} />
+                </View>
+
+                {results.grossProfitMargin !== undefined && (
+                  <View style={styles.marginRow}>
+                    <MarginCard label="Gross Margin" value={(results.grossProfitMargin ?? 0).toFixed(1) + "%"} good={(results.grossProfitMargin ?? 0) >= 20} />
+                    <MarginCard label="Net Margin"   value={(results.netProfitMargin ?? 0).toFixed(1) + "%"}   good={(results.netProfitMargin ?? 0) >= 10} />
+                  </View>
+                )}
+
+                {/* Actions */}
+                <View style={styles.actionRow}>
+                  <TouchableOpacity style={[styles.actionBtn, { borderColor: C.primary + "55" }]} onPress={() => setSaveModal(true)} activeOpacity={0.8}>
+                    <Feather name="save" size={15} color={C.primary} />
+                    <Text style={[styles.actionBtnText, { color: C.primary }]}>Save Case</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.actionBtn, { borderColor: C.secondary + "55" }]} onPress={handleExportPDF} activeOpacity={0.8} disabled={exporting}>
+                    {exporting ? <ActivityIndicator size="small" color={C.secondary} /> : <Feather name="download" size={15} color={C.secondary} />}
+                    <Text style={[styles.actionBtnText, { color: C.secondary }]}>Export PDF</Text>
+                  </TouchableOpacity>
+                </View>
+              </StepCard>
+            </>
+          )}
+
+          <TabNavBar current="index" />
+        </ScrollView>
+
+        {/* Save Modal */}
+        <Modal visible={saveModal} transparent animationType="slide" onRequestClose={() => setSaveModal(false)}>
+          <View style={styles.modalOverlay}>
+            <LinearGradient colors={["#1A2C42", "#111F30"]} style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Save Case</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Client / Company Name"
+                placeholderTextColor="#3D5A74"
+                value={clientName}
+                onChangeText={setClientName}
+                autoFocus
+              />
+              <View style={styles.modalBtns}>
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSaveModal(false)}>
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: C.primary }]} onPress={handleSave} disabled={saving}>
+                  {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalSaveText}>Save</Text>}
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
           </View>
-        </View>
-      </Modal>
+        </Modal>
       </PageBackground>
     </KeyboardAvoidingView>
   );
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
-
-function SectionCard({ title, color, children }: { title: string; color: string; children: React.ReactNode }) {
+// ── Sub-components ──────────────────────────────────────────────────────────────
+function StepCard({ step, title, subtitle, children }: { step: number; title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <View style={styles.card}>
-      <View style={[styles.cardAccent, { backgroundColor: color }]} />
-      <Text style={styles.cardTitle}>{title}</Text>
-      {children}
-    </View>
+    <LinearGradient colors={["#1A2C42", "#152236"]} style={sc.card}>
+      <View style={sc.header}>
+        <View style={sc.badge}>
+          <Text style={sc.badgeNum}>{step}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={sc.title}>{title}</Text>
+          {subtitle && <Text style={sc.subtitle}>{subtitle}</Text>}
+        </View>
+      </View>
+      <View style={sc.body}>{children}</View>
+    </LinearGradient>
   );
 }
+const sc = StyleSheet.create({
+  card: { borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54", overflow: "hidden", padding: 18 },
+  header: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 16 },
+  badge: { width: 32, height: 32, borderRadius: 10, backgroundColor: "#0C1826", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#1E3A54" },
+  badgeNum: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#4A9EFF" },
+  title: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#E8F4FF" },
+  subtitle: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 2 },
+  body: { gap: 0 },
+});
 
 function InputRow({ label, value, onChangeText }: { label: string; value: string; onChangeText: (v: string) => void }) {
   return (
     <View style={styles.inputRow}>
       <Text style={styles.inputLabel}>{label}</Text>
-      <TextInput style={styles.input} value={value} onChangeText={onChangeText}
-        keyboardType="numeric" placeholder="0" placeholderTextColor={C.textSecondary} returnKeyType="done" />
-    </View>
-  );
-}
-
-function ResultCard({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <View style={styles.resultCard}>
-      <Text style={styles.resultLabel}>{label}</Text>
-      <Text style={[styles.resultValue, { color }]}>{value}</Text>
+      <TextInput
+        style={styles.input} value={value} onChangeText={onChangeText}
+        keyboardType="numeric" placeholder="0" placeholderTextColor="#2A4A65"
+        returnKeyType="done"
+      />
     </View>
   );
 }
 
 function RatioTile({ label, value, good, neutral }: { label: string; value: string; good?: boolean; neutral?: boolean }) {
-  const color = neutral ? C.secondary : good ? C.success : C.warning;
+  const color = neutral ? "#7A9BB5" : good ? C.success : C.warning;
   return (
-    <View style={styles.ratioTile}>
-      <Text style={styles.ratioLabel}>{label}</Text>
-      <Text style={[styles.ratioValue, { color }]}>{value}</Text>
-    </View>
+    <LinearGradient colors={["#0C1826", "#111F30"]} style={styles.ratioTile}>
+      <Text style={styles.ratioVal}>{value}</Text>
+      <Text style={[styles.ratioLabel, { color }]}>{label}</Text>
+      {!neutral && <View style={[styles.ratioDot, { backgroundColor: good ? C.success : C.warning }]} />}
+    </LinearGradient>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+function MarginCard({ label, value, good }: { label: string; value: string; good: boolean }) {
+  return (
+    <LinearGradient colors={[good ? C.success + "18" : C.warning + "18", "#152236"]} style={styles.marginCard}>
+      <Text style={styles.marginLabel}>{label}</Text>
+      <Text style={[styles.marginValue, { color: good ? C.success : C.warning }]}>{value}</Text>
+    </LinearGradient>
+  );
+}
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 18, gap: 14 },
-  header: { marginBottom: 4 },
-  brand:    { fontSize: 9, fontFamily: "Inter_700Bold", color: C.primary, letterSpacing: 2, marginBottom: 4 },
-  title:    { fontSize: 26, fontFamily: "Inter_700Bold", color: C.text },
-  subtitle: { fontSize: 12, color: C.textSecondary, marginTop: 2, fontFamily: "Inter_400Regular" },
+  scroll: { paddingHorizontal: 16, gap: 16 },
 
-  uploadSection: { gap: 6 },
-  uploadSectionHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  uploadDot: { width: 8, height: 8, borderRadius: 4 },
-  uploadSectionTitle: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.text, textTransform: "uppercase", letterSpacing: 0.8 },
+  uploadGap: { height: 10 },
+  parsedChip: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12, backgroundColor: C.success + "15", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  parsedText: { fontSize: 11, color: C.success, fontFamily: "Inter_500Medium", flex: 1 },
 
-  uploadBtn: {
-    flexDirection: "row", alignItems: "center", gap: 10,
-    backgroundColor: C.card, borderWidth: 1.5, borderColor: C.border,
-    borderStyle: "dashed", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
-  },
-  uploadBtnDone: {
-    borderStyle: "solid", borderColor: C.success + "55",
-    backgroundColor: C.success + "10",
-  },
-  uploadText: { flex: 1, fontSize: 13, color: C.textSecondary, fontFamily: "Inter_500Medium" },
-  formatChip: { fontSize: 11, color: C.success, fontFamily: "Inter_400Regular", paddingLeft: 16, marginTop: -2 },
+  hintText: { fontSize: 11, color: "#4A6A84", fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 10, lineHeight: 17 },
+  manualToggle: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 14, paddingVertical: 8, borderTopWidth: 1, borderTopColor: "#1A2F45" },
+  manualToggleText: { fontSize: 12, color: C.primary, fontFamily: "Inter_500Medium" },
 
-  card: { backgroundColor: C.card, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: C.border, overflow: "hidden" },
-  cardAccent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3 },
-  cardTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: C.text, marginBottom: 12 },
+  inputRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#0F1E30" },
+  inputLabel: { flex: 1, fontSize: 12, color: "#8BAAC0", fontFamily: "Inter_400Regular" },
+  input: { width: 110, textAlign: "right", backgroundColor: "#0C1826", borderWidth: 1, borderColor: "#1E3A54", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: "#E8F4FF", fontFamily: "Inter_600SemiBold" },
 
-  inputRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  inputLabel: { flex: 1, fontSize: 12, color: C.textSecondary, fontFamily: "Inter_400Regular" },
-  input: {
-    width: 110, textAlign: "right", backgroundColor: "#0D1B2A",
-    borderWidth: 1, borderColor: C.border, borderRadius: 10,
-    paddingHorizontal: 10, paddingVertical: 8,
-    fontSize: 13, color: C.text, fontFamily: "Inter_500Medium",
-  },
+  eligCard: { borderRadius: 16, padding: 18, alignItems: "center", marginBottom: 16, borderWidth: 1, borderColor: "#1E3A54" },
+  eligLabel: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.8 },
+  eligAmount: { fontSize: 32, fontFamily: "Inter_700Bold", marginTop: 4 },
+  eligSub: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 4 },
 
-  calcBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
-    backgroundColor: C.primary, borderRadius: 16, paddingVertical: 15,
-  },
-  calcBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  ratioGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 },
+  ratioTile: { width: "31%", flexGrow: 1, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 12, alignItems: "center", gap: 5 },
+  ratioVal: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#E8F4FF" },
+  ratioLabel: { fontSize: 9, fontFamily: "Inter_500Medium", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3 },
+  ratioDot: { width: 5, height: 5, borderRadius: 3 },
 
-  resultRow: { flexDirection: "row", gap: 12 },
-  resultCard: { flex: 1, backgroundColor: C.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.border },
-  resultLabel: { fontSize: 10, color: C.textSecondary, fontFamily: "Inter_500Medium", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
-  resultValue: { fontSize: 19, fontFamily: "Inter_700Bold" },
+  marginRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
+  marginCard: { flex: 1, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 14, alignItems: "center", gap: 6 },
+  marginLabel: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.4 },
+  marginValue: { fontSize: 22, fontFamily: "Inter_700Bold" },
 
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  ratioTile: { width: "30%", flexGrow: 1, backgroundColor: C.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: C.border, alignItems: "center" },
-  ratioLabel: { fontSize: 9, color: C.textSecondary, fontFamily: "Inter_500Medium", textAlign: "center", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 },
-  ratioValue: { fontSize: 16, fontFamily: "Inter_700Bold" },
-
-  actionRow: { flexDirection: "row", gap: 12 },
-  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 13, borderWidth: 1 },
+  actionRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 14, paddingVertical: 13, borderWidth: 1, backgroundColor: "#0C1826" },
   actionBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
 
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
-  modalCard: { backgroundColor: C.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16 },
-  modalTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: C.text },
-  modalInput: {
-    backgroundColor: "#0D1B2A", borderRadius: 14, borderWidth: 1, borderColor: C.border,
-    paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: C.text, fontFamily: "Inter_400Regular",
-  },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.75)", justifyContent: "flex-end" },
+  modalCard: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 16, borderWidth: 1, borderColor: "#1E3A54" },
+  modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#E8F4FF" },
+  modalInput: { backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: "#E8F4FF", fontFamily: "Inter_400Regular" },
   modalBtns: { flexDirection: "row", gap: 12 },
-  modalCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: C.border, alignItems: "center" },
-  modalCancelText: { fontSize: 14, fontFamily: "Inter_500Medium", color: C.textSecondary },
-  modalSaveBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, backgroundColor: C.primary, alignItems: "center" },
+  modalCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", alignItems: "center" },
+  modalCancelText: { fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A9BB5" },
+  modalSaveBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: "center" },
   modalSaveText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

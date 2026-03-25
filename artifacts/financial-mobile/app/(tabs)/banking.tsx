@@ -51,10 +51,11 @@ export default function BankingScreen() {
   const [results, setResults] = useState<BankingResults | null>(null);
   const [parsing, setParsing] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [slot, setSlot] = useState<SlotInfo>(null);
+  const [saving, setSaving]     = useState(false);
+  const [slot, setSlot]         = useState<SlotInfo>(null);
   const [saveModal, setSaveModal] = useState(false);
   const [clientName, setClientName] = useState("");
+  const [showInputs, setShowInputs] = useState(false);
 
   const set = (key: keyof BankingData, val: string) => {
     const num = parseFloat(val.replace(/,/g, "")) || 0;
@@ -192,41 +193,60 @@ export default function BankingScreen() {
             )}
           </GlassCard>
 
-          {/* ── Credits & Debits ─────────────────────────────────── */}
+          {/* ── Analyze Button — right after upload ──────────────── */}
           <GlassCard accentColor={C.accent}>
-            <CardTitle>Credits & Debits</CardTitle>
-            {FIELDS.filter((f) => f.section === "credit").map((f) => (
-              <InputRow key={f.key} label={f.label} value={data[f.key] ? String(data[f.key]) : ""}
-                onChangeText={(v) => set(f.key, v)} />
-            ))}
+            <GradientButton
+              onPress={handleCalculate}
+              label="Analyze Banking Performance"
+              icon="activity"
+              colors={[C.accent, "#D4A800"]}
+              textColor="#000"
+            />
+            {!slot && (
+              <Text style={styles.analyzeHint}>
+                Upload a bank statement above for auto-fill, or enter values manually below.
+              </Text>
+            )}
+            <TouchableOpacity
+              style={styles.manualToggle}
+              onPress={() => setShowInputs((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Feather name={showInputs ? "chevron-up" : "edit-2"} size={13} color={C.accent} />
+              <Text style={[styles.manualToggleText, { color: C.accent }]}>
+                {showInputs ? "Hide manual inputs" : "Enter / review values manually"}
+              </Text>
+            </TouchableOpacity>
           </GlassCard>
 
-          {/* ── Balances ─────────────────────────────────────────── */}
-          <GlassCard accentColor={C.primary}>
-            <CardTitle>Account Balances</CardTitle>
-            {FIELDS.filter((f) => f.section === "balance").map((f) => (
-              <InputRow key={f.key} label={f.label} value={data[f.key] ? String(data[f.key]) : ""}
-                onChangeText={(v) => set(f.key, v)} />
-            ))}
-          </GlassCard>
+          {/* ── Collapsible Input Fields ──────────────────────────── */}
+          {showInputs && (
+            <>
+              <GlassCard accentColor={C.accent}>
+                <CardTitle>Credits & Debits</CardTitle>
+                {FIELDS.filter((f) => f.section === "credit").map((f) => (
+                  <InputRow key={f.key} label={f.label} value={data[f.key] ? String(data[f.key]) : ""}
+                    onChangeText={(v) => set(f.key, v)} />
+                ))}
+              </GlassCard>
 
-          {/* ── Risk Indicators ──────────────────────────────────── */}
-          <GlassCard accentColor={C.secondary}>
-            <CardTitle>Risk Indicators</CardTitle>
-            {FIELDS.filter((f) => f.section === "risk").map((f) => (
-              <InputRow key={f.key} label={f.label} value={data[f.key] ? String(data[f.key]) : ""}
-                onChangeText={(v) => set(f.key, v)} />
-            ))}
-          </GlassCard>
+              <GlassCard accentColor={C.primary}>
+                <CardTitle>Account Balances</CardTitle>
+                {FIELDS.filter((f) => f.section === "balance").map((f) => (
+                  <InputRow key={f.key} label={f.label} value={data[f.key] ? String(data[f.key]) : ""}
+                    onChangeText={(v) => set(f.key, v)} />
+                ))}
+              </GlassCard>
 
-          {/* Calculate */}
-          <GradientButton
-            onPress={handleCalculate}
-            label="Analyze Performance"
-            icon="activity"
-            colors={[C.accent, "#D4A800"]}
-            textColor="#000"
-          />
+              <GlassCard accentColor={C.secondary}>
+                <CardTitle>Risk Indicators</CardTitle>
+                {FIELDS.filter((f) => f.section === "risk").map((f) => (
+                  <InputRow key={f.key} label={f.label} value={data[f.key] ? String(data[f.key]) : ""}
+                    onChangeText={(v) => set(f.key, v)} />
+                ))}
+              </GlassCard>
+            </>
+          )}
 
           {/* ── Results ──────────────────────────────────────────── */}
           {results && (
@@ -341,7 +361,10 @@ function StatusBadge({ label, value }: { label: string; value: string | undefine
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 16, gap: 14 },
+  scroll: { paddingHorizontal: 16, gap: 16 },
+  analyzeHint: { fontSize: 11, color: "#4A6A84", fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 10, lineHeight: 17 },
+  manualToggle: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 14, paddingVertical: 8, borderTopWidth: 1, borderTopColor: "#1A2F45" },
+  manualToggleText: { fontSize: 12, fontFamily: "Inter_500Medium" },
 
   sectionHint: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginBottom: 12, lineHeight: 17 },
   metaBox: { marginTop: 10, gap: 5, backgroundColor: "#0C1826", borderRadius: 10, padding: 10 },

@@ -185,9 +185,18 @@ export default function MultiYearScreen() {
       >
         <PageHeader
           title="Multi-Year Analysis"
-          subtitle="Upload up to 3 years of financials and compare trends"
+          subtitle="Upload Balance Sheet + P&L for up to 3 years, then compare trends"
           accentColor={GREEN}
         />
+
+        {/* ── How to use hint ─────────────────────────────────────── */}
+        <LinearGradient colors={[GREEN + "14", GREEN + "06"]} style={styles.howToCard}>
+          <Feather name="info" size={14} color={GREEN} />
+          <Text style={styles.howToText}>
+            Expand each year below → Upload documents → Tap{" "}
+            <Text style={{ color: GREEN, fontFamily: "Inter_600SemiBold" }}>Generate Trend Analysis</Text>
+          </Text>
+        </LinearGradient>
 
         {/* ── Year slots ──────────────────────────────────────────── */}
         {slots.map((slot, i) => (
@@ -442,7 +451,10 @@ function TableRow({ label, vals, format }: { label: string; vals: (number | unde
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 16, gap: 14 },
+  scroll: { paddingHorizontal: 16, gap: 16 },
+
+  howToCard: { flexDirection: "row", alignItems: "flex-start", gap: 10, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#10B98133" },
+  howToText: { flex: 1, fontSize: 12, color: "#7A9BB5", fontFamily: "Inter_400Regular", lineHeight: 18 },
 
   yearCard: { borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54", overflow: "hidden" },
   yearHeader: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16 },
