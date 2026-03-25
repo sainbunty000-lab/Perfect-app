@@ -17,6 +17,7 @@ import { parseFinancialDocument, FORMAT_LABEL } from "@/lib/parseViaApi";
 import { exportWorkingCapitalPDF } from "@/lib/pdfExport";
 import { useCreateCase } from "@workspace/api-client-react";
 import { PageBackground, PageHeader, GlassCard, UploadZone, GradientButton, CardTitle, TabNavBar } from "@/components/UI";
+import { BarChart, DonutGauge, HorizontalBarChart, compactINR } from "@/lib/charts";
 
 const C = Colors.light;
 
@@ -269,6 +270,41 @@ export default function WorkingCapitalScreen() {
                   </View>
                 )}
 
+                {/* ── Assets vs Liabilities Chart ─────────────────── */}
+                {((data.currentAssets ?? 0) > 0 || (data.currentLiabilities ?? 0) > 0) && (
+                  <View style={styles.chartSection}>
+                    <Text style={styles.chartSectionTitle}>Balance Sheet Breakdown</Text>
+                    <BarChart
+                      datasets={[
+                        { label: "Assets", color: C.primary, values: [data.currentAssets ?? 0, data.debtors ?? 0, data.cash ?? 0] },
+                        { label: "Liabilities", color: "#EF4444", values: [data.currentLiabilities ?? 0, data.creditors ?? 0, 0] },
+                      ]}
+                      labels={["Current", "Debtors/Cred.", "Cash"]}
+                      width={280}
+                      height={160}
+                      grouped
+                    />
+                  </View>
+                )}
+
+                {/* ── Working Capital Composition ──────────────────── */}
+                {(results.eligibilityAmount ?? 0) > 0 && (
+                  <View style={styles.chartSection}>
+                    <Text style={styles.chartSectionTitle}>WC Composition</Text>
+                    <HorizontalBarChart
+                      items={[
+                        { label: "Curr. Assets",   value: data.currentAssets ?? 0,      max: Math.max(data.currentAssets ?? 0, data.currentLiabilities ?? 0, 1), color: "#4A9EFF",  format: compactINR },
+                        { label: "Curr. Liab.",    value: data.currentLiabilities ?? 0, max: Math.max(data.currentAssets ?? 0, data.currentLiabilities ?? 0, 1), color: "#EF4444",  format: compactINR },
+                        { label: "Net WC",          value: Math.abs(results.workingCapitalAmount ?? 0), max: Math.max(data.currentAssets ?? 0, 1),                   color: C.primary,  format: compactINR },
+                        { label: "Eligibility",    value: results.eligibilityAmount ?? 0,             max: Math.max(data.currentAssets ?? 0, 1),                   color: "#F5C842",  format: compactINR },
+                      ]}
+                    />
+                  </View>
+                )}
+
+                {/* ── Final Summary Card ───────────────────────────── */}
+                <WCFinalSummary results={results} />
+
                 {/* Actions */}
                 <View style={styles.actionRow}>
                   <TouchableOpacity style={[styles.actionBtn, { borderColor: C.primary + "55" }]} onPress={() => setSaveModal(true)} activeOpacity={0.8}>
@@ -356,6 +392,87 @@ function InputRow({ label, value, onChangeText }: { label: string; value: string
   );
 }
 
+// ── WC Final Summary ─────────────────────────────────────────────────────────
+function WCFinalSummary({ results }: { results: WorkingCapitalResults }) {
+  const cr  = results.currentRatio   ?? 0;
+  const qr  = results.quickRatio     ?? 0;
+  const npm = results.netProfitMargin ?? 0;
+  const elig = results.eligibilityAmount ?? 0;
+
+  const verdictGood = cr >= 1.33 && qr >= 1 && elig > 0;
+  const verdictMid  = cr >= 1.0  && elig > 0;
+  const verdict     = verdictGood ? "ELIGIBLE" : verdictMid ? "BORDERLINE" : "NOT ELIGIBLE";
+  const verdictColor = verdictGood ? "#10B981" : verdictMid ? "#F5C842" : "#EF4444";
+  const verdictBg    = verdictGood ? "#10B98120" : verdictMid ? "#F5C84220" : "#EF444420";
+
+  const points: { icon: string; color: string; text: string }[] = [
+    cr >= 1.33
+      ? { icon: "check-circle", color: "#10B981", text: `Current Ratio ${cr.toFixed(2)}x — adequate liquidity` }
+      : { icon: "alert-circle", color: "#EF4444", text: `Current Ratio ${cr.toFixed(2)}x — below 1.33x benchmark` },
+    qr >= 1
+      ? { icon: "check-circle", color: "#10B981", text: `Quick Ratio ${qr.toFixed(2)}x — strong short-term position` }
+      : { icon: "alert-circle", color: "#F5C842", text: `Quick Ratio ${qr.toFixed(2)}x — may face liquidity pressure` },
+    npm >= 10
+      ? { icon: "check-circle", color: "#10B981", text: `Net Margin ${npm.toFixed(1)}% — healthy profitability` }
+      : { icon: "info",         color: "#4A9EFF", text: `Net Margin ${npm.toFixed(1)}% — monitor for improvement` },
+    { icon: "trending-up", color: "#4A9EFF", text: `WC Cycle: ${(results.workingCapitalCycle ?? 0).toFixed(0)} days — ${(results.workingCapitalCycle ?? 999) < 60 ? "efficient operations" : "review receivables"}` },
+  ];
+
+  const recommendation = verdictGood
+    ? `Based on the analysis, the applicant demonstrates strong working capital position with Current Ratio ${cr.toFixed(2)}x and WC eligibility of ${compactINR(elig)}. Recommend approval subject to verification of documents.`
+    : verdictMid
+    ? `The applicant shows borderline working capital adequacy. Consider approving a reduced limit with enhanced monitoring. Current Ratio ${cr.toFixed(2)}x needs improvement to above 1.33x.`
+    : `Working capital position is inadequate for loan eligibility at this time. Current Ratio ${cr.toFixed(2)}x is below minimum benchmark. Suggest reapplication after improving current asset position.`;
+
+  return (
+    <View style={sumS.wrap}>
+      {/* Verdict banner */}
+      <View style={[sumS.verdict, { backgroundColor: verdictBg, borderColor: verdictColor + "60" }]}>
+        <Feather name={verdictGood ? "check-circle" : verdictMid ? "alert-circle" : "x-circle"} size={22} color={verdictColor} />
+        <View style={{ flex: 1 }}>
+          <Text style={[sumS.verdictLabel, { color: verdictColor }]}>{verdict}</Text>
+          <Text style={sumS.verdictSub}>Working Capital Assessment</Text>
+        </View>
+        <Text style={[sumS.verdictAmount, { color: verdictColor }]}>{compactINR(elig)}</Text>
+      </View>
+
+      {/* Key points */}
+      <View style={sumS.pointsWrap}>
+        {points.map((p, i) => (
+          <View key={i} style={sumS.pointRow}>
+            <Feather name={p.icon as any} size={14} color={p.color} />
+            <Text style={sumS.pointText}>{p.text}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Recommendation */}
+      <View style={sumS.recBox}>
+        <View style={sumS.recHeader}>
+          <Feather name="file-text" size={13} color={C.primary} />
+          <Text style={sumS.recTitle}>Recommendation</Text>
+        </View>
+        <Text style={sumS.recText}>{recommendation}</Text>
+      </View>
+    </View>
+  );
+}
+
+const sumS = StyleSheet.create({
+  wrap: { gap: 12, marginTop: 4 },
+  verdict: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 16, borderWidth: 1, padding: 14 },
+  verdictLabel: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  verdictSub: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 1 },
+  verdictAmount: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  pointsWrap: { gap: 8, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 14 },
+  pointRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  pointText: { flex: 1, fontSize: 12, color: "#9BBDD4", fontFamily: "Inter_400Regular", lineHeight: 18 },
+  recBox: { backgroundColor: "#0A1628", borderRadius: 14, borderWidth: 1, borderColor: C.primary + "30", padding: 14, gap: 8 },
+  recHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  recTitle: { fontSize: 11, fontFamily: "Inter_700Bold", color: C.primary, textTransform: "uppercase", letterSpacing: 0.8 },
+  recText: { fontSize: 12, color: "#8BAFC9", fontFamily: "Inter_400Regular", lineHeight: 19 },
+});
+
 function RatioTile({ label, value, good, neutral }: { label: string; value: string; good?: boolean; neutral?: boolean }) {
   const color = neutral ? "#7A9BB5" : good ? C.success : C.warning;
   return (
@@ -390,6 +507,9 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#0F1E30" },
   inputLabel: { flex: 1, fontSize: 12, color: "#8BAAC0", fontFamily: "Inter_400Regular" },
   input: { width: 110, textAlign: "right", backgroundColor: "#0C1826", borderWidth: 1, borderColor: "#1E3A54", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: "#E8F4FF", fontFamily: "Inter_600SemiBold" },
+
+  chartSection: { alignItems: "center", gap: 8, marginVertical: 4, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 14 },
+  chartSectionTitle: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#7A9BB5", textTransform: "uppercase", letterSpacing: 0.8, alignSelf: "flex-start" },
 
   eligCard: { borderRadius: 16, padding: 18, alignItems: "center", marginBottom: 16, borderWidth: 1, borderColor: "#1E3A54" },
   eligLabel: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.8 },

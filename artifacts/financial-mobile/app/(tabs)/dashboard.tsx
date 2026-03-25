@@ -16,7 +16,7 @@ import { useRouter } from "expo-router";
 import { useListCases } from "@workspace/api-client-react";
 import Colors from "@/constants/colors";
 import { PageBackground, TabNavBar } from "@/components/UI";
-import { MiniSparkline, compactINR } from "@/lib/charts";
+import { MiniSparkline, PieChart, HorizontalBarChart, compactINR } from "@/lib/charts";
 
 const C = Colors.light;
 
@@ -279,34 +279,84 @@ export default function DashboardScreen() {
           </>
         )}
 
-        {/* ── Case Type Breakdown ──────────────────────────────────── */}
+        {/* ── Case Type Breakdown — Pie Chart ─────────────────────── */}
         {total > 0 && (
           <>
             <Text style={styles.sectionLabel}>Case Distribution</Text>
             <LinearGradient colors={["#112034", "#0D1A2A"]} style={styles.breakdownCard}>
-              {["working_capital", "banking", "multi_year", "gst_itr"].map((type) => {
-                const count = byType[type] ?? 0;
-                const pct   = total ? (count / total) * 100 : 0;
-                const color = TYPE_COLOR[type];
-                return (
-                  <View key={type} style={styles.breakRow}>
-                    <View style={[styles.breakIcon, { backgroundColor: color + "22" }]}>
-                      <Feather name={TYPE_ICON[type] as any} size={13} color={color} />
-                    </View>
-                    <Text style={styles.breakLabel}>{TYPE_LABEL[type]}</Text>
-                    <View style={styles.breakBarBg}>
-                      <View
-                        style={[styles.breakBarFill, {
-                          width: `${Math.max(pct, count > 0 ? 4 : 0)}%` as any,
-                          backgroundColor: color,
-                        }]}
-                      />
-                    </View>
-                    <Text style={[styles.breakCount, { color }]}>{count}</Text>
-                    <Text style={styles.breakPct}>{pct.toFixed(0)}%</Text>
-                  </View>
-                );
-              })}
+              <Text style={styles.chartTitle}>Portfolio by Module</Text>
+              <Text style={styles.chartSub}>Distribution of all {total} analysed cases</Text>
+
+              <View style={{ alignItems: "center", marginVertical: 8 }}>
+                <PieChart
+                  size={180}
+                  centerValue={String(total)}
+                  centerLabel="cases"
+                  slices={
+                    (["working_capital", "banking", "multi_year", "gst_itr"] as const)
+                      .filter((t) => (byType[t] ?? 0) > 0)
+                      .map((t) => ({
+                        label: TYPE_LABEL[t],
+                        value: byType[t] ?? 0,
+                        color: TYPE_COLOR[t],
+                      }))
+                  }
+                />
+              </View>
+
+              {/* Detailed bar breakdown below pie */}
+              <View style={{ marginTop: 8 }}>
+                <HorizontalBarChart
+                  items={(["working_capital", "banking", "multi_year", "gst_itr"] as const).map((t) => ({
+                    label: TYPE_LABEL[t],
+                    value: byType[t] ?? 0,
+                    max: total,
+                    color: TYPE_COLOR[t],
+                    format: (v: number) => `${v} case${v !== 1 ? "s" : ""}`,
+                  }))}
+                />
+              </View>
+            </LinearGradient>
+          </>
+        )}
+
+        {/* ── Portfolio Health ─────────────────────────────────────── */}
+        {total > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>Portfolio Health</Text>
+            <LinearGradient colors={["#112034", "#0D1A2A"]} style={styles.breakdownCard}>
+              <View style={styles.chartTop}>
+                <View>
+                  <Text style={styles.chartTitle}>Key Averages</Text>
+                  <Text style={styles.chartSub}>Across all saved cases</Text>
+                </View>
+              </View>
+
+              <HorizontalBarChart
+                items={[
+                  ...(bankSpark.length > 0 ? [{
+                    label: "Avg Bank Score",
+                    value: Math.round(bankAvg),
+                    max: 100,
+                    color: "#D4A800",
+                    format: (v: number) => `${v}/100`,
+                  }] : []),
+                  ...(wcSpark.length > 0 ? [{
+                    label: "Max WC Elig.",
+                    value: maxWC,
+                    max: maxWC * 1.2 || 1,
+                    color: "#4A9EFF",
+                    format: compactINR,
+                  }] : []),
+                  {
+                    label: "Total Cases",
+                    value: total,
+                    max: Math.max(total, 10),
+                    color: "#20B2AA",
+                    format: (v: number) => `${v} saved`,
+                  },
+                ]}
+              />
             </LinearGradient>
           </>
         )}

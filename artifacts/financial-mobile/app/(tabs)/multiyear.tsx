@@ -11,7 +11,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { parseFinancialDocument, FORMAT_LABEL } from "@/lib/parseViaApi";
-import { LineChart, BarChart, ChartLegend, compactINR } from "@/lib/charts";
+import { LineChart, BarChart, PieChart, ChartLegend, HorizontalBarChart, compactINR } from "@/lib/charts";
 import { PageBackground, PageHeader, GlassCard, UploadZone, GradientButton, CardTitle, TabNavBar } from "@/components/UI";
 
 const C = Colors.light;
@@ -423,6 +423,33 @@ export default function MultiYearScreen() {
                 );
               })}
             </LinearGradient>
+
+            {/* ── Revenue vs Profit pie / bar ─────────────────── */}
+            {slots.length >= 2 && (() => {
+              const salesVals = slots.map(s => s.data.sales ?? 0);
+              const profitVals = slots.map(s => s.data.netProfit ?? 0);
+              const cogsVals = slots.map(s => s.data.cogs ?? 0);
+              if (salesVals.every(v => v === 0)) return null;
+              return (
+                <View style={myStyles.chartBox}>
+                  <Text style={myStyles.chartBoxTitle}>Revenue vs Profit vs COGS</Text>
+                  <BarChart
+                    datasets={[
+                      { label: "Sales", color: "#4A9EFF", values: salesVals },
+                      { label: "COGS",  color: "#EF4444", values: cogsVals },
+                      { label: "Profit", color: "#10B981", values: profitVals },
+                    ]}
+                    labels={slots.map(s => s.data.label.replace("FY ", ""))}
+                    width={300}
+                    height={160}
+                    grouped
+                  />
+                </View>
+              );
+            })()}
+
+            {/* ── Multi-Year Final Summary ─────────────────────── */}
+            <MultiYearFinalSummary slots={slots} />
           </>
         )}
 
@@ -431,6 +458,101 @@ export default function MultiYearScreen() {
     </PageBackground>
   );
 }
+
+// ─── Multi-Year Final Summary ─────────────────────────────────────────────────
+function MultiYearFinalSummary({ slots }: { slots: { data: YearData }[] }) {
+  if (slots.length < 2) return null;
+
+  const filled = slots.filter(s => (s.data.sales ?? 0) > 0);
+  if (filled.length < 2) return null;
+
+  const first = filled[0].data;
+  const last  = filled[filled.length - 1].data;
+  const years = filled.length - 1;
+
+  const cagr = (base: number | undefined, end: number | undefined) => {
+    if (!base || !end || base <= 0) return null;
+    return ((end / base) ** (1 / years) - 1) * 100;
+  };
+
+  const salesCagr  = cagr(first.sales, last.sales);
+  const profitCagr = cagr(first.netProfit, last.netProfit);
+
+  const trend = (salesCagr ?? 0) >= 10 ? "STRONG GROWTH"
+    : (salesCagr ?? 0) >= 5  ? "MODERATE GROWTH"
+    : (salesCagr ?? 0) >= 0  ? "STABLE"
+    : "DECLINING";
+
+  const trendColor = (salesCagr ?? 0) >= 10 ? GREEN
+    : (salesCagr ?? 0) >= 5 ? TEAL
+    : (salesCagr ?? 0) >= 0 ? AMBER
+    : "#EF4444";
+
+  const lastCR = currentRatio(last);
+  const latestEligible = (() => {
+    const wc = wcAmount(last);
+    return wc !== undefined && wc > 0 ? Math.max(0, wc * 0.75) : 0;
+  })();
+
+  const recommendation = (salesCagr ?? 0) >= 10 && (lastCR ?? 0) >= 1.33
+    ? `The business demonstrates consistent strong growth with ${salesCagr?.toFixed(1)}% sales CAGR over ${years} year(s). Liquidity ratios are satisfactory (CR ${(lastCR ?? 0).toFixed(2)}x). The trend supports credit enhancement or fresh lending with confidence.`
+    : (salesCagr ?? 0) >= 0
+    ? `The business shows stable-to-moderate performance with ${salesCagr?.toFixed(1)}% sales CAGR. Current Ratio of ${(lastCR ?? 0).toFixed(2)}x ${(lastCR ?? 0) >= 1.33 ? "meets" : "is below"} the 1.33x benchmark. Standard credit terms are appropriate with periodic reviews.`
+    : `Revenue trend is declining (${salesCagr?.toFixed(1)}% CAGR). This requires closer scrutiny before sanctioning credit. Consider requesting projections and a business turnaround plan.`;
+
+  const metrics = [
+    salesCagr  !== null ? { label: "Revenue CAGR", value: salesCagr.toFixed(1) + "%",  color: salesCagr >= 0 ? GREEN : "#EF4444" } : null,
+    profitCagr !== null ? { label: "Profit CAGR",  value: profitCagr.toFixed(1) + "%", color: profitCagr >= 0 ? GREEN : "#EF4444" } : null,
+    { label: "Latest CR",   value: (lastCR ?? 0).toFixed(2) + "x", color: (lastCR ?? 0) >= 1.33 ? GREEN : AMBER },
+    latestEligible > 0 ? { label: "WC Eligibility", value: compactINR(latestEligible), color: TEAL } : null,
+  ].filter(Boolean) as { label: string; value: string; color: string }[];
+
+  return (
+    <View style={myStyles.sumWrap}>
+      <View style={[myStyles.sumHeader, { backgroundColor: trendColor + "18", borderColor: trendColor + "55" }]}>
+        <Feather name="trending-up" size={20} color={trendColor} />
+        <View style={{ flex: 1 }}>
+          <Text style={[myStyles.sumVerdict, { color: trendColor }]}>{trend}</Text>
+          <Text style={myStyles.sumSub}>{years}-Year Multi-Period Analysis</Text>
+        </View>
+      </View>
+
+      <View style={myStyles.sumMetrics}>
+        {metrics.map((m, i) => (
+          <View key={i} style={myStyles.metricItem}>
+            <Text style={[myStyles.metricVal, { color: m.color }]}>{m.value}</Text>
+            <Text style={myStyles.metricLabel}>{m.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={myStyles.recBox}>
+        <View style={myStyles.recHeader}>
+          <Feather name="file-text" size={13} color={C.primary} />
+          <Text style={myStyles.recTitle}>Multi-Year Recommendation</Text>
+        </View>
+        <Text style={myStyles.recText}>{recommendation}</Text>
+      </View>
+    </View>
+  );
+}
+
+const myStyles = StyleSheet.create({
+  chartBox: { alignItems: "center", gap: 8, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 14 },
+  chartBoxTitle: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#7A9BB5", textTransform: "uppercase", letterSpacing: 0.8, alignSelf: "flex-start" },
+  sumWrap: { gap: 10, marginTop: 4 },
+  sumHeader: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
+  sumVerdict: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  sumSub: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 2 },
+  sumMetrics: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  metricItem: { flex: 1, minWidth: "40%", backgroundColor: "#0C1826", borderRadius: 12, borderWidth: 1, borderColor: "#1E3A54", padding: 12, alignItems: "center", gap: 4 },
+  metricVal: { fontSize: 20, fontFamily: "Inter_700Bold" },
+  metricLabel: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_400Regular", textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center" },
+  recBox: { backgroundColor: "#0A1628", borderRadius: 12, borderWidth: 1, borderColor: C.primary + "30", padding: 12, gap: 8 },
+  recHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  recTitle: { fontSize: 10, fontFamily: "Inter_700Bold", color: C.primary, textTransform: "uppercase", letterSpacing: 0.8 },
+  recText: { fontSize: 12, color: "#8BAFC9", fontFamily: "Inter_400Regular", lineHeight: 18 },
+});
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function MiniField({ label, value }: { label: string; value: string }) {

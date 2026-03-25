@@ -16,6 +16,7 @@ import {
   PageBackground, PageHeader, GlassCard, UploadZone,
   GradientButton, CardTitle, TabNavBar,
 } from "@/components/UI";
+import { DonutGauge, PieChart, HorizontalBarChart } from "@/lib/charts";
 
 const C = Colors.light;
 const PURPLE = "#A855F7";
@@ -417,6 +418,35 @@ export default function GstItrScreen() {
                 </GlassCard>
               )}
 
+              {/* ── Tax Breakdown Pie + Compliance Score ─────────── */}
+              {result.gstr && (
+                <View style={gstStyles.chartRow}>
+                  {/* Compliance score gauge */}
+                  <DonutGauge
+                    value={result.complianceScore}
+                    max={100}
+                    color={result.complianceScore >= 80 ? "#10B981" : result.complianceScore >= 60 ? "#F5C842" : "#EF4444"}
+                    size={90}
+                    label="Score"
+                  />
+                  {/* Tax type bars */}
+                  {((result.gstr.igstCollected ?? 0) > 0 || (result.gstr.cgstCollected ?? 0) > 0 || (result.gstr.sgstCollected ?? 0) > 0) && (
+                    <View style={{ flex: 1 }}>
+                      <HorizontalBarChart
+                        items={[
+                          { label: "IGST", value: result.gstr.igstCollected ?? 0, max: Math.max(result.gstr.igstCollected ?? 0, result.gstr.cgstCollected ?? 0, result.gstr.sgstCollected ?? 0, 1), color: PURPLE, format: (v) => "₹" + (v / 1000).toFixed(0) + "K" },
+                          { label: "CGST", value: result.gstr.cgstCollected ?? 0, max: Math.max(result.gstr.igstCollected ?? 0, result.gstr.cgstCollected ?? 0, result.gstr.sgstCollected ?? 0, 1), color: BLUE, format: (v) => "₹" + (v / 1000).toFixed(0) + "K" },
+                          { label: "SGST", value: result.gstr.sgstCollected ?? 0, max: Math.max(result.gstr.igstCollected ?? 0, result.gstr.cgstCollected ?? 0, result.gstr.sgstCollected ?? 0, 1), color: "#10B981", format: (v) => "₹" + (v / 1000).toFixed(0) + "K" },
+                        ]}
+                      />
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* ── GST/ITR Final Summary ─────────────────────────── */}
+              <GstFinalSummary result={result} />
+
               {/* Export */}
               <TouchableOpacity style={[styles.exportBtn, { borderColor: PURPLE + "55" }]}
                 onPress={handleExport} disabled={exporting}>
@@ -454,6 +484,90 @@ function MetricTile({ label, value, good, neutral }: { label: string; value: str
     </LinearGradient>
   );
 }
+
+// ── GST-ITR Final Summary ─────────────────────────────────────────────────────
+function GstFinalSummary({ result }: { result: AnalysisResult }) {
+  const score = result.complianceScore;
+  const grade = result.complianceGrade;
+  const color = score >= 80 ? "#10B981" : score >= 60 ? "#F5C842" : "#EF4444";
+
+  const verdict = score >= 80 ? "COMPLIANT — EXCELLENT PROFILE"
+    : score >= 65 ? "LARGELY COMPLIANT"
+    : score >= 50 ? "MODERATE COMPLIANCE RISK"
+    : "HIGH COMPLIANCE RISK";
+
+  const recommendation = score >= 80
+    ? `The taxpayer demonstrates excellent GST/ITR compliance with a score of ${score}/100 (Grade ${grade}). All filings appear timely and complete. This is a low-risk profile; proceed with credit processing without additional compliance scrutiny.`
+    : score >= 65
+    ? `Good compliance profile (${score}/100, Grade ${grade}) with minor areas of concern. Recommend verifying ${result.flags.length > 0 ? result.flags[0].toLowerCase() : "filing history"} before credit sanction. Standard due diligence is sufficient.`
+    : score >= 50
+    ? `Moderate compliance risk detected (${score}/100, Grade ${grade}). ${result.flags.length} flag(s) identified. Enhanced document verification required. Consider requesting last 3 years' ITR and 12-month GSTR filings for detailed review.`
+    : `High compliance risk (${score}/100, Grade ${grade}). Multiple flags indicate irregular tax behaviour. A comprehensive compliance audit is recommended before any credit decision. Internal escalation may be warranted.`;
+
+  const itrMetrics = result.itr ? [
+    { label: "Taxable Income",   value: "₹" + ((result.itr.taxableIncome ?? 0) / 100000).toFixed(1) + "L", color: BLUE },
+    { label: "Net Tax Liability", value: "₹" + ((result.itr.netTaxLiability ?? 0) / 100000).toFixed(1) + "L", color: PURPLE },
+    result.itr.refundAmount ? { label: "Refund",         value: "₹" + ((result.itr.refundAmount ?? 0) / 100000).toFixed(1) + "L", color: "#10B981" } : null,
+    result.effectiveTaxRate ? { label: "Eff. Tax Rate",  value: result.effectiveTaxRate.toFixed(1) + "%", color: "#F5C842" } : null,
+  ].filter(Boolean) as { label: string; value: string; color: string }[] : [];
+
+  return (
+    <View style={gstSumS.wrap}>
+      {/* Header */}
+      <View style={[gstSumS.header, { backgroundColor: color + "18", borderColor: color + "55" }]}>
+        <View style={[gstSumS.grade, { borderColor: color }]}>
+          <Text style={[gstSumS.gradeText, { color }]}>{grade}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[gstSumS.verdictText, { color }]}>{verdict}</Text>
+          <Text style={gstSumS.verdictSub}>Compliance Score: {score}/100</Text>
+        </View>
+      </View>
+
+      {/* ITR metrics row */}
+      {itrMetrics.length > 0 && (
+        <View style={gstSumS.metricsRow}>
+          {itrMetrics.map((m, i) => (
+            <View key={i} style={gstSumS.metricItem}>
+              <Text style={[gstSumS.metricVal, { color: m.color }]}>{m.value}</Text>
+              <Text style={gstSumS.metricLabel}>{m.label}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Recommendation */}
+      <View style={gstSumS.recBox}>
+        <View style={gstSumS.recHeader}>
+          <Feather name="shield" size={13} color={C.primary} />
+          <Text style={gstSumS.recTitle}>Compliance Recommendation</Text>
+        </View>
+        <Text style={gstSumS.recText}>{recommendation}</Text>
+      </View>
+    </View>
+  );
+}
+
+const gstStyles = StyleSheet.create({
+  chartRow: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 14 },
+});
+
+const gstSumS = StyleSheet.create({
+  wrap: { gap: 10, marginTop: 4 },
+  header: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
+  grade: { width: 46, height: 46, borderRadius: 12, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  gradeText: { fontSize: 24, fontFamily: "Inter_700Bold" },
+  verdictText: { fontSize: 12, fontFamily: "Inter_700Bold", lineHeight: 16 },
+  verdictSub: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 2 },
+  metricsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  metricItem: { flex: 1, minWidth: "40%", backgroundColor: "#0C1826", borderRadius: 12, borderWidth: 1, borderColor: "#1E3A54", padding: 10, alignItems: "center", gap: 4 },
+  metricVal: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  metricLabel: { fontSize: 9, color: "#7A9BB5", fontFamily: "Inter_400Regular", textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center" },
+  recBox: { backgroundColor: "#0A1628", borderRadius: 12, borderWidth: 1, borderColor: C.primary + "30", padding: 12, gap: 8 },
+  recHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  recTitle: { fontSize: 10, fontFamily: "Inter_700Bold", color: C.primary, textTransform: "uppercase", letterSpacing: 0.8 },
+  recText: { fontSize: 12, color: "#8BAFC9", fontFamily: "Inter_400Regular", lineHeight: 18 },
+});
 
 const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 16, gap: 14 },

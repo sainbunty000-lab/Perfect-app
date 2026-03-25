@@ -246,6 +246,130 @@ export function DonutGauge({ value, max = 100, color, size = 80, label }: { valu
   );
 }
 
+// ─── PieChart (Donut) ────────────────────────────────────────────────────────
+export interface PieSlice {
+  label: string;
+  value: number;
+  color: string;
+}
+interface PieChartProps {
+  slices: PieSlice[];
+  size?: number;
+  centerLabel?: string;
+  centerValue?: string;
+}
+
+export function PieChart({ slices, size = 160, centerLabel, centerValue }: PieChartProps) {
+  const cx = size / 2, cy = size / 2;
+  const r  = size * 0.40;
+  const ri = size * 0.24;
+
+  const total = slices.reduce((s, d) => s + Math.max(0, d.value), 0);
+  if (!total) return null;
+
+  let angle = -Math.PI / 2;
+  const arcs = slices.map((slice) => {
+    const sweep = (Math.max(0, slice.value) / total) * 2 * Math.PI;
+    const sa = angle, ea = angle + sweep;
+    angle = ea;
+
+    const x1 = cx + r  * Math.cos(sa), y1 = cy + r  * Math.sin(sa);
+    const x2 = cx + r  * Math.cos(ea), y2 = cy + r  * Math.sin(ea);
+    const ix1 = cx + ri * Math.cos(sa), iy1 = cy + ri * Math.sin(sa);
+    const ix2 = cx + ri * Math.cos(ea), iy2 = cy + ri * Math.sin(ea);
+    const large = sweep > Math.PI ? 1 : 0;
+
+    // Label position — midpoint of arc
+    const ma = sa + sweep / 2;
+    const lx = cx + (r + 10) * Math.cos(ma), ly = cy + (r + 10) * Math.sin(ma);
+
+    return {
+      d: `M${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large},1 ${x2.toFixed(2)},${y2.toFixed(2)} L${ix2.toFixed(2)},${iy2.toFixed(2)} A${ri},${ri} 0 ${large},0 ${ix1.toFixed(2)},${iy1.toFixed(2)} Z`,
+      color: slice.color,
+      label: slice.label,
+      value: slice.value,
+      pct: Math.round((Math.max(0, slice.value) / total) * 100),
+      lx, ly,
+    };
+  });
+
+  return (
+    <View style={{ alignItems: "center", gap: 14 }}>
+      <Svg width={size} height={size}>
+        {arcs.map((a, i) => (
+          <Path key={i} d={a.d} fill={a.color} stroke="#0A1628" strokeWidth={2.5} />
+        ))}
+        {/* Center */}
+        {centerValue && (
+          <SvgText x={cx} y={cy - 6} textAnchor="middle" fontSize={15} fontFamily="Inter_700Bold" fill="#E8F4FF">
+            {centerValue}
+          </SvgText>
+        )}
+        {centerLabel && (
+          <SvgText x={cx} y={cy + 11} textAnchor="middle" fontSize={9} fill="#7A9BB5">
+            {centerLabel}
+          </SvgText>
+        )}
+      </Svg>
+
+      {/* Legend grid */}
+      <View style={pieStyles.legend}>
+        {arcs.map((a, i) => (
+          <View key={i} style={pieStyles.legendItem}>
+            <View style={[pieStyles.dot, { backgroundColor: a.color }]} />
+            <Text style={pieStyles.legendLabel}>{a.label}</Text>
+            <Text style={[pieStyles.legendPct, { color: a.color }]}>{a.pct}%</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const pieStyles = StyleSheet.create({
+  legend: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 10, paddingHorizontal: 8 },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  legendLabel: { fontSize: 10, color: "#8BAFC9", fontFamily: "Inter_400Regular" },
+  legendPct: { fontSize: 10, fontFamily: "Inter_700Bold" },
+});
+
+// ─── HorizontalBarChart ──────────────────────────────────────────────────────
+export interface HBarItem {
+  label: string;
+  value: number;
+  max: number;
+  color: string;
+  format?: (v: number) => string;
+}
+export function HorizontalBarChart({ items }: { items: HBarItem[] }) {
+  return (
+    <View style={hbStyles.wrap}>
+      {items.map((item, i) => {
+        const pct = Math.min(100, item.max ? (item.value / item.max) * 100 : 0);
+        const fmt = item.format ?? compactINR;
+        return (
+          <View key={i} style={hbStyles.row}>
+            <Text style={hbStyles.label}>{item.label}</Text>
+            <View style={hbStyles.barBg}>
+              <View style={[hbStyles.barFill, { width: `${pct}%` as any, backgroundColor: item.color }]} />
+            </View>
+            <Text style={[hbStyles.value, { color: item.color }]}>{fmt(item.value)}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+const hbStyles = StyleSheet.create({
+  wrap: { gap: 10 },
+  row: { flexDirection: "row", alignItems: "center", gap: 10 },
+  label: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_500Medium", width: 72 },
+  barBg: { flex: 1, height: 7, backgroundColor: "#1E3A54", borderRadius: 4, overflow: "hidden" },
+  barFill: { height: "100%", borderRadius: 4 },
+  value: { fontSize: 11, fontFamily: "Inter_700Bold", width: 64, textAlign: "right" },
+});
+
 // ─── Legend ──────────────────────────────────────────────────────────────────
 export function ChartLegend({ items }: { items: { label: string; color: string }[] }) {
   return (
