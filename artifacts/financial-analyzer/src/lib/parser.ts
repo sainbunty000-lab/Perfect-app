@@ -623,15 +623,25 @@ function parseTextBankStatement(text: string): Partial<BankingData> {
 
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
+  // Strip date-like tokens (DD/MM/YYYY, DD-MM-YYYY, DD/MM/YY) before extracting balance figures
+  // so that "31/01/2026" doesn't pollute number extraction with [31,1,2026]
+  const stripDates = (s: string) =>
+    s.replace(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g, " ")
+     .replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/gi, " ");
+
   const findSummary = (keywords: string[]): number | undefined => {
     for (let i = 0; i < lines.length; i++) {
       const lower = lines[i].toLowerCase();
       if (keywords.some((kw) => lower.includes(kw))) {
-        const nums = extractNumbers(lines[i]);
-        const pos = nums.filter((n) => n > 0);
-        if (pos.length > 0) return pos[pos.length - 1];
+        // Strip dates first so we don't pick up day/month/year digits as amounts
+        const clean = stripDates(lines[i]);
+        const nums = extractNumbers(clean);
+        // Prefer numbers >= 1 (not fractions), take the last significant one
+        const sig = nums.filter((n) => n >= 1);
+        if (sig.length > 0) return sig[sig.length - 1];
+        // Fallback: any number on next line
         if (i + 1 < lines.length) {
-          const nNums = extractNumbers(lines[i + 1]);
+          const nNums = extractNumbers(stripDates(lines[i + 1]));
           if (nNums.length > 0) return Math.abs(nNums[0]);
         }
       }
@@ -639,12 +649,20 @@ function parseTextBankStatement(text: string): Partial<BankingData> {
     return undefined;
   };
 
-  data.openingBalance = findSummary(["opening balance", "op bal", "op. balance", "balance b/f", "balance b/d"]);
-  data.closingBalance = findSummary(["closing balance", "cl bal", "cl. balance", "balance c/f", "balance c/d"]);
-  data.totalCredits   = findSummary(["total credits", "total cr", "total deposits", "total deposit"]);
-  data.totalDebits    = findSummary(["total debits", "total dr", "total withdrawals", "total withdrawal"]);
-  data.averageBalance = findSummary(["average balance", "avg balance", "avg bal", "average monthly balance"]);
-  data.minimumBalance = findSummary(["minimum balance", "min balance", "min bal", "minimum monthly balance"]);
+  data.openingBalance = findSummary(["opening balance", "op bal", "op. balance", "balance b/f", "balance b/d", "brought forward"]);
+  data.closingBalance = findSummary(["closing balance", "cl bal", "cl. balance", "balance c/f", "balance c/d", "carried forward"]);
+  data.totalCredits   = findSummary([
+    "total credits", "total cr", "total deposits", "total deposit",
+    "total amount credited", "amount credited", "total inflow", "total receipts",
+    "cr total", "credit total",
+  ]);
+  data.totalDebits    = findSummary([
+    "total debits", "total dr", "total withdrawals", "total withdrawal",
+    "total amount debited", "amount debited", "total outflow", "total payments",
+    "dr total", "debit total",
+  ]);
+  data.averageBalance = findSummary(["average balance", "avg balance", "avg bal", "average monthly balance", "monthly average", "amb"]);
+  data.minimumBalance = findSummary(["minimum balance", "min balance", "min bal", "minimum monthly balance", "mmb"]);
   data.overdraftUsage = findSummary(["overdraft", "od utilisation", "od limit used", "od availed"]);
   data.loanRepayments = findSummary(["loan repayment", "emi repaid", "loan emi"]);
   data.bankCharges    = findSummary(["bank charges", "service charges", "total charges"]);
@@ -667,7 +685,8 @@ function parseTextBankStatement(text: string): Partial<BankingData> {
   if (data.openingBalance) balances.push(data.openingBalance);
 
   if (headerIdx >= 0) {
-    const datePattern = /^\d{2}\/\d{2}\/\d{2,4}/;
+    // Match DD/MM/YY, DD/MM/YYYY, DD-MM-YY, DD-MM-YYYY at start of line (with optional leading space)
+    const datePattern = /^\s*\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/;
 
     for (let i = headerIdx + 1; i < lines.length; i++) {
       const line = lines[i];

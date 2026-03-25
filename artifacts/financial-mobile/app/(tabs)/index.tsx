@@ -19,54 +19,167 @@ import { useCreateCase } from "@workspace/api-client-react";
 const C = Colors.light;
 
 const BS_FIELDS: { key: keyof WorkingCapitalData; label: string }[] = [
-  { key: "currentAssets", label: "Current Assets" },
+  { key: "currentAssets",      label: "Current Assets" },
   { key: "currentLiabilities", label: "Current Liabilities" },
-  { key: "inventory", label: "Inventory" },
-  { key: "debtors", label: "Debtors / Receivables" },
-  { key: "creditors", label: "Creditors / Payables" },
-  { key: "cash", label: "Cash & Bank Balance" },
+  { key: "inventory",          label: "Inventory" },
+  { key: "debtors",            label: "Debtors / Receivables" },
+  { key: "creditors",          label: "Creditors / Payables" },
+  { key: "cash",               label: "Cash & Bank Balance" },
 ];
 
 const PL_FIELDS: { key: keyof WorkingCapitalData; label: string }[] = [
-  { key: "sales", label: "Revenue / Sales" },
-  { key: "cogs", label: "Cost of Goods Sold" },
-  { key: "purchases", label: "Purchases" },
-  { key: "expenses", label: "Operating Expenses" },
-  { key: "netProfit", label: "Net Profit" },
+  { key: "sales",      label: "Revenue / Sales" },
+  { key: "cogs",       label: "Cost of Goods Sold" },
+  { key: "purchases",  label: "Purchases" },
+  { key: "expenses",   label: "Operating Expenses" },
+  { key: "netProfit",  label: "Net Profit" },
 ];
 
 const INR = (n?: number) =>
   n !== undefined ? "₹" + Math.abs(n).toLocaleString("en-IN") : "—";
 
-function parseTextLocally(text: string): Partial<WorkingCapitalData> {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const getNum = (keywords: string[]): number | undefined => {
-    for (const line of lines) {
+// ─── Improved text parser (handles Indian numbers, 2-column PDFs) ─────────────
+function parseIndianNum(raw: string): number | null {
+  const s = raw.trim().replace(/[₹$€£]/g, "").replace(/\bRs\.?\b/gi, "").replace(/\s/g, "").replace(/[()]/g, "");
+  const cleaned = s.replace(/,/g, "");
+  const val = parseFloat(cleaned);
+  return isNaN(val) ? null : Math.abs(val);
+}
+
+function extractNums(str: string): number[] {
+  const pattern = /\([\d,]+(?:\.\d+)?\)|[\d,]+(?:\.\d+)?/g;
+  const out: number[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(str)) !== null) {
+    const v = parseIndianNum(m[0]);
+    if (v !== null && v >= 0) out.push(v);
+  }
+  return out;
+}
+
+function parseWorkingCapitalText(text: string): Partial<WorkingCapitalData> {
+  const lines = text
+    .replace(/\t/g, "  ")
+    .replace(/ {3,}/g, "   ")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  const findVal = (keywords: string[], excludeKeywords: string[] = []): number | undefined => {
+    const candidates: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       const lower = line.toLowerCase();
-      if (keywords.some((k) => lower.includes(k))) {
-        const nums = line.match(/-?[\d,]+(?:\.\d+)?/g);
-        if (nums) {
-          const v = parseFloat(nums[nums.length - 1].replace(/,/g, ""));
-          if (!isNaN(v) && Math.abs(v) >= 1) return Math.abs(v);
-        }
+
+      let matchPos = -1, matchLen = 0;
+      for (const kw of keywords) {
+        const pos = lower.indexOf(kw.toLowerCase());
+        if (pos !== -1) { matchPos = pos; matchLen = kw.length; break; }
+      }
+      if (matchPos === -1) continue;
+
+      if (excludeKeywords.length > 0) {
+        const exBefore = lower.slice(0, matchPos);
+        const exAfter  = lower.slice(matchPos + matchLen);
+        const skip = excludeKeywords.some((ex) => {
+          const exL = ex.toLowerCase();
+          if (exAfter.includes(exL)) return true;
+          const idx = exBefore.lastIndexOf(exL);
+          if (idx === -1) return false;
+          return matchPos - (idx + exL.length) <= 20;
+        });
+        if (skip) continue;
+      }
+
+      const afterKw = line.slice(matchPos + matchLen);
+      const nums = extractNums(afterKw).filter((n) => n >= 1);
+      if (nums.length > 0) { candidates.push(nums[0]); continue; }
+
+      for (let d = 1; d <= 3; d++) {
+        if (i + d >= lines.length) break;
+        const ns = extractNums(lines[i + d]).filter((n) => n >= 1);
+        if (ns.length > 0) { candidates.push(ns[0]); break; }
       }
     }
-    return undefined;
+    return candidates.length > 0 ? candidates[0] : undefined;
   };
+
+  const compCash = findVal([
+    "bank and cash balance", "cash and bank balance", "cash and bank",
+    "cash & bank", "balance with bank", "bank balance", "cash in hand",
+  ], ["overdraft", "od limit", "cash credit"]);
+
+  const compDebtors = findVal([
+    "sundry debtors", "trade debtors", "trade receivables",
+    "accounts receivable", "book debts", "debtors",
+  ], ["bad debts", "provision for doubtful", "creditors"]);
+
+  const compInventory = findVal([
+    "closing stock", "closing inventory", "stock-in-trade", "inventories",
+    "finished goods", "raw material stock", "work-in-progress", "stock",
+  ]);
+
+  const compAdvances = findVal([
+    "loans & advances", "loans and advances", "advance to", "prepaid", "other current assets",
+  ], ["secured loans", "unsecured loans", "term loan"]);
+
+  const caLabel =
+    findVal(["total current assets"]) ??
+    findVal(["net current assets"]) ??
+    findVal(["current assets"], ["non-current", "fixed assets"]);
+  const caSum = (compCash || 0) + (compDebtors || 0) + (compInventory || 0) + (compAdvances || 0);
+  const currentAssets = caSum > (caLabel || 0) ? caSum : (caLabel || caSum || undefined);
+
+  const compCreditors = findVal([
+    "sundry creditors", "trade creditors", "trade payables", "accounts payable", "creditors",
+  ], ["debtors", "receivable"]);
+
+  const compProvisions = findVal([
+    "other provision b/s", "other current liabilities", "provisions", "accrued liabilities",
+  ], ["for taxation", "income tax"]);
+
+  const clLabel =
+    findVal(["total current liabilities"]) ??
+    findVal(["current liabilities"], ["non-current"]);
+  const clSum = (compCreditors || 0) + (compProvisions || 0);
+  const currentLiabilities = clLabel ?? (clSum > 0 ? clSum : undefined);
+
+  const compSales = findVal([
+    "net sales", "net revenue", "revenue from operations", "total income from operations",
+    "gross receipts", "gross sales", "turnover", "revenue", "sales",
+  ], ["cost of", "purchase"]);
+
+  const compCogs = findVal(["cost of goods sold", "cost of sales", "cogs"]);
+  const compPurchases = findVal(["purchases", "material cost"]);
+
+  const compExpenses = findVal([
+    "total expenses", "operating expenses", "total expenditure",
+    "expenses", "overheads",
+  ], ["depreciation", "finance cost"]);
+
+  const compNetProfit = findVal([
+    "profit after tax", "net profit after tax", "profit for the year",
+    "net profit", "profit", "pat",
+  ]);
+
   return {
-    currentAssets: getNum(["current assets"]),
-    currentLiabilities: getNum(["current liabilities"]),
-    inventory: getNum(["inventory", "closing stock", "stock"]),
-    debtors: getNum(["sundry debtors", "trade debtors", "debtors", "receivables"]),
-    creditors: getNum(["sundry creditors", "trade creditors", "creditors", "payables"]),
-    cash: getNum(["cash and bank", "bank and cash", "cash balance"]),
-    sales: getNum(["gross receipts", "net sales", "revenue", "turnover", "sales"]),
-    cogs: getNum(["cost of goods sold", "cost of sales", "cogs"]),
-    purchases: getNum(["purchases"]),
-    expenses: getNum(["total expenses", "operating expenses"]),
-    netProfit: getNum(["net profit", "profit after tax", "to net profit"]),
+    currentAssets,
+    currentLiabilities,
+    inventory: compInventory,
+    debtors: compDebtors,
+    creditors: compCreditors,
+    cash: compCash,
+    sales: compSales,
+    cogs: compCogs,
+    purchases: compPurchases,
+    expenses: compExpenses,
+    netProfit: compNetProfit,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+type UploadSlot = { name: string; format: string } | null;
 
 export default function WorkingCapitalScreen() {
   const insets = useSafeAreaInsets();
@@ -75,10 +188,12 @@ export default function WorkingCapitalScreen() {
 
   const [data, setData] = useState<WorkingCapitalData>({});
   const [results, setResults] = useState<WorkingCapitalResults | null>(null);
-  const [parsing, setParsing] = useState(false);
+  const [bsParsing, setBsParsing] = useState(false);
+  const [plParsing, setPlParsing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; format: string }[]>([]);
+  const [bsSlot, setBsSlot] = useState<UploadSlot>(null);
+  const [plSlot, setPlSlot] = useState<UploadSlot>(null);
   const [saveModal, setSaveModal] = useState(false);
   const [clientName, setClientName] = useState("");
 
@@ -87,31 +202,50 @@ export default function WorkingCapitalScreen() {
     setData((d) => ({ ...d, [key]: num }));
   };
 
-  const handlePickFile = async () => {
+  const pickAndParse = async (section: "bs" | "pl") => {
+    const setParsing = section === "bs" ? setBsParsing : setPlParsing;
+    const setSlot    = section === "bs" ? setBsSlot    : setPlSlot;
+
+    // Fields relevant to each section
+    const bsKeys: (keyof WorkingCapitalData)[] = ["currentAssets","currentLiabilities","inventory","debtors","creditors","cash"];
+    const plKeys: (keyof WorkingCapitalData)[] = ["sales","cogs","purchases","expenses","netProfit"];
+    const relevantKeys = section === "bs" ? bsKeys : plKeys;
+
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["*/*"],
         copyToCacheDirectory: true,
-        multiple: true,
+        multiple: false,
       });
       if (result.canceled) return;
+      const asset = result.assets[0];
 
       setParsing(true);
       let merged: Partial<WorkingCapitalData> = {};
 
-      for (const asset of result.assets) {
-        try {
-          const parsed = await parseFileViaApi(asset.uri, asset.name, asset.mimeType ?? undefined);
-          const fields = parseTextLocally(parsed.text);
-          merged = { ...merged, ...fields };
-          setUploadedFiles((f) => [...f, { name: asset.name, format: FORMAT_LABEL[parsed.format] }]);
-        } catch {
-          // skip failed file
+      try {
+        const parsed = await parseFileViaApi(asset.uri, asset.name, asset.mimeType ?? undefined);
+        const all = parseWorkingCapitalText(parsed.text);
+        // Only apply fields relevant to this section
+        for (const key of relevantKeys) {
+          if (all[key] !== undefined) merged[key] = all[key];
         }
+        setSlot({ name: asset.name, format: FORMAT_LABEL[parsed.format] });
+      } catch {
+        Alert.alert("Parse Error", "Could not read the file. Please enter values manually.");
+        setParsing(false);
+        return;
       }
 
-      setData((d) => ({ ...d, ...merged }));
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (Object.keys(merged).length > 0) {
+        setData((d) => ({ ...d, ...merged }));
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Alert.alert(
+          "No Data Found",
+          `Could not extract ${section === "bs" ? "Balance Sheet" : "P&L"} values automatically. Please enter values manually.`
+        );
+      }
     } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
@@ -183,24 +317,73 @@ export default function WorkingCapitalScreen() {
           <Text style={styles.subtitle}>Balance Sheet & Profit & Loss Analysis</Text>
         </View>
 
-        {/* Upload */}
-        <TouchableOpacity style={styles.uploadBtn} onPress={handlePickFile} activeOpacity={0.8}>
-          {parsing ? <ActivityIndicator color={C.secondary} size="small" /> : <Feather name="upload" size={18} color={C.secondary} />}
-          <Text style={styles.uploadText}>
-            {uploadedFiles.length > 0 ? `${uploadedFiles.length} file(s) loaded` : "Upload PDF / Excel / Image / TXT"}
-          </Text>
-          {uploadedFiles.length > 0 && <Feather name="check-circle" size={16} color={C.success} />}
-        </TouchableOpacity>
-
-        {uploadedFiles.map((f, i) => (
-          <View key={i} style={styles.fileChip}>
-            <Feather name="file" size={13} color={C.textSecondary} />
-            <Text style={styles.fileChipText} numberOfLines={1}>{f.name}</Text>
-            <Text style={styles.fileChipFormat}>{f.format}</Text>
+        {/* ── Upload: Balance Sheet ─────────────────────────────────────── */}
+        <View style={styles.uploadSection}>
+          <View style={styles.uploadSectionHeader}>
+            <View style={[styles.uploadDot, { backgroundColor: C.secondary }]} />
+            <Text style={styles.uploadSectionTitle}>Balance Sheet</Text>
           </View>
-        ))}
+          <TouchableOpacity
+            style={[styles.uploadBtn, bsSlot && styles.uploadBtnDone]}
+            onPress={() => pickAndParse("bs")}
+            activeOpacity={0.8}
+            disabled={bsParsing}
+          >
+            {bsParsing ? (
+              <ActivityIndicator color={C.secondary} size="small" />
+            ) : bsSlot ? (
+              <Feather name="check-circle" size={16} color={C.success} />
+            ) : (
+              <Feather name="upload" size={16} color={C.secondary} />
+            )}
+            <Text style={[styles.uploadText, bsSlot && { color: C.text }]} numberOfLines={1}>
+              {bsParsing ? "Parsing…" : bsSlot ? bsSlot.name : "Upload Balance Sheet (PDF / Excel / Image)"}
+            </Text>
+            {bsSlot && (
+              <TouchableOpacity onPress={() => { setBsSlot(null); }} hitSlop={8}>
+                <Feather name="x" size={14} color={C.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+          {bsSlot && (
+            <Text style={styles.formatChip}>{bsSlot.format} — Current Assets, Liabilities, Debtors, Creditors extracted</Text>
+          )}
+        </View>
 
-        {/* Balance Sheet */}
+        {/* ── Upload: Profit & Loss ─────────────────────────────────────── */}
+        <View style={styles.uploadSection}>
+          <View style={styles.uploadSectionHeader}>
+            <View style={[styles.uploadDot, { backgroundColor: C.primary }]} />
+            <Text style={styles.uploadSectionTitle}>Profit & Loss</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.uploadBtn, plSlot && styles.uploadBtnDone]}
+            onPress={() => pickAndParse("pl")}
+            activeOpacity={0.8}
+            disabled={plParsing}
+          >
+            {plParsing ? (
+              <ActivityIndicator color={C.primary} size="small" />
+            ) : plSlot ? (
+              <Feather name="check-circle" size={16} color={C.success} />
+            ) : (
+              <Feather name="upload" size={16} color={C.primary} />
+            )}
+            <Text style={[styles.uploadText, plSlot && { color: C.text }]} numberOfLines={1}>
+              {plParsing ? "Parsing…" : plSlot ? plSlot.name : "Upload P&L Statement (PDF / Excel / Image)"}
+            </Text>
+            {plSlot && (
+              <TouchableOpacity onPress={() => { setPlSlot(null); }} hitSlop={8}>
+                <Feather name="x" size={14} color={C.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+          {plSlot && (
+            <Text style={styles.formatChip}>{plSlot.format} — Sales, Expenses, Net Profit extracted</Text>
+          )}
+        </View>
+
+        {/* ── Balance Sheet Fields ────────────────────────────────────── */}
         <SectionCard title="Balance Sheet" color={C.secondary}>
           {BS_FIELDS.map((f) => (
             <InputRow key={f.key} label={f.label}
@@ -209,7 +392,7 @@ export default function WorkingCapitalScreen() {
           ))}
         </SectionCard>
 
-        {/* P&L */}
+        {/* ── P&L Fields ────────────────────────────────────────────── */}
         <SectionCard title="Profit & Loss" color={C.primary}>
           {PL_FIELDS.map((f) => (
             <InputRow key={f.key} label={f.label}
@@ -233,22 +416,21 @@ export default function WorkingCapitalScreen() {
             </View>
 
             <View style={styles.grid}>
-              <RatioTile label="Current Ratio" value={results.currentRatio?.toFixed(2) + "x"} good={(results.currentRatio ?? 0) >= 1.33} />
-              <RatioTile label="Quick Ratio" value={results.quickRatio?.toFixed(2) + "x"} good={(results.quickRatio ?? 0) >= 1} />
-              <RatioTile label="Inv. Turnover" value={results.inventoryTurnover?.toFixed(2) + "x"} good={(results.inventoryTurnover ?? 0) >= 4} />
-              <RatioTile label="Debtor Days" value={results.debtorDays?.toFixed(0) + "d"} good={(results.debtorDays ?? 999) <= 90} />
-              <RatioTile label="Creditor Days" value={results.creditorDays?.toFixed(0) + "d"} neutral />
-              <RatioTile label="WC Cycle" value={results.workingCapitalCycle?.toFixed(0) + "d"} good={(results.workingCapitalCycle ?? 999) < 60} />
+              <RatioTile label="Current Ratio" value={(results.currentRatio ?? 0).toFixed(2) + "x"} good={(results.currentRatio ?? 0) >= 1.33} />
+              <RatioTile label="Quick Ratio"   value={(results.quickRatio ?? 0).toFixed(2) + "x"}   good={(results.quickRatio ?? 0) >= 1} />
+              <RatioTile label="Inv. Turnover" value={(results.inventoryTurnover ?? 0).toFixed(2) + "x"} good={(results.inventoryTurnover ?? 0) >= 4} />
+              <RatioTile label="Debtor Days"   value={(results.debtorDays ?? 0).toFixed(0) + "d"}   good={(results.debtorDays ?? 999) <= 90} />
+              <RatioTile label="Creditor Days" value={(results.creditorDays ?? 0).toFixed(0) + "d"} neutral />
+              <RatioTile label="WC Cycle"      value={(results.workingCapitalCycle ?? 0).toFixed(0) + "d"} good={(results.workingCapitalCycle ?? 999) < 60} />
             </View>
 
-            {(results.grossProfitMargin !== undefined) && (
+            {results.grossProfitMargin !== undefined && (
               <View style={styles.resultRow}>
                 <ResultCard label="Gross Margin" value={(results.grossProfitMargin ?? 0).toFixed(1) + "%"} color={(results.grossProfitMargin ?? 0) >= 20 ? C.success : C.warning} />
-                <ResultCard label="Net Margin" value={(results.netProfitMargin ?? 0).toFixed(1) + "%"} color={(results.netProfitMargin ?? 0) >= 10 ? C.success : C.warning} />
+                <ResultCard label="Net Margin"   value={(results.netProfitMargin ?? 0).toFixed(1) + "%"}   color={(results.netProfitMargin ?? 0) >= 10 ? C.success : C.warning} />
               </View>
             )}
 
-            {/* Action Row */}
             <View style={styles.actionRow}>
               <TouchableOpacity style={[styles.actionBtn, { backgroundColor: C.card, borderColor: C.border }]}
                 onPress={() => setSaveModal(true)} activeOpacity={0.8}>
@@ -293,6 +475,8 @@ export default function WorkingCapitalScreen() {
   );
 }
 
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
 function SectionCard({ title, color, children }: { title: string; color: string; children: React.ReactNode }) {
   return (
     <View style={styles.card}>
@@ -332,25 +516,31 @@ function RatioTile({ label, value, good, neutral }: { label: string; value: stri
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 18, gap: 14 },
   header: { marginBottom: 4 },
-  brand: { fontSize: 9, fontFamily: "Inter_700Bold", color: C.primary, letterSpacing: 2, marginBottom: 4 },
-  title: { fontSize: 26, fontFamily: "Inter_700Bold", color: C.text },
+  brand:    { fontSize: 9, fontFamily: "Inter_700Bold", color: C.primary, letterSpacing: 2, marginBottom: 4 },
+  title:    { fontSize: 26, fontFamily: "Inter_700Bold", color: C.text },
   subtitle: { fontSize: 12, color: C.textSecondary, marginTop: 2, fontFamily: "Inter_400Regular" },
+
+  uploadSection: { gap: 6 },
+  uploadSectionHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  uploadDot: { width: 8, height: 8, borderRadius: 4 },
+  uploadSectionTitle: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.text, textTransform: "uppercase", letterSpacing: 0.8 },
 
   uploadBtn: {
     flexDirection: "row", alignItems: "center", gap: 10,
-    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
+    backgroundColor: C.card, borderWidth: 1.5, borderColor: C.border,
+    borderStyle: "dashed", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
+  },
+  uploadBtnDone: {
+    borderStyle: "solid", borderColor: C.success + "55",
+    backgroundColor: C.success + "10",
   },
   uploadText: { flex: 1, fontSize: 13, color: C.textSecondary, fontFamily: "Inter_500Medium" },
-  fileChip: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: "#162032", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
-  },
-  fileChipText: { flex: 1, fontSize: 12, color: C.text, fontFamily: "Inter_400Regular" },
-  fileChipFormat: { fontSize: 10, color: C.textSecondary, fontFamily: "Inter_400Regular" },
+  formatChip: { fontSize: 11, color: C.success, fontFamily: "Inter_400Regular", paddingLeft: 16, marginTop: -2 },
 
   card: { backgroundColor: C.card, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: C.border, overflow: "hidden" },
   cardAccent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3 },
