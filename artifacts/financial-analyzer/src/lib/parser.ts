@@ -688,30 +688,66 @@ function parseTextBankStatement(text: string): Partial<BankingData> {
     // Match DD/MM/YY, DD/MM/YYYY, DD-MM-YY, DD-MM-YYYY at start of line (with optional leading space)
     const datePattern = /^\s*\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/;
 
+    // Noise lines to skip (headers, footers, bank boilerplate)
+    const isNoise = (s: string) => {
+      const l = s.toLowerCase();
+      return (
+        l.includes("page no") || l.includes("hdfc bank") ||
+        l.includes("registered office") || l.includes("state account") ||
+        l.includes("contents of this") || l.includes("account branch") ||
+        l.includes("from :") || l.includes("statement of account") ||
+        l.includes("nominee") || l.includes("customer id") ||
+        l.includes("branch") || l.includes("ifsc")
+      );
+    };
+
     for (let i = headerIdx + 1; i < lines.length; i++) {
       const line = lines[i];
-      const lower = line.toLowerCase();
-
-      if (
-        lower.includes("page no") || lower.includes("hdfc bank") ||
-        lower.includes("registered office") || lower.includes("state account") ||
-        lower.includes("contents of this") || lower.includes("account branch") ||
-        lower.includes("from :") || lower.includes("statement of account")
-      ) continue;
-
+      if (isNoise(line)) continue;
       if (!datePattern.test(line)) continue;
 
-      const nums = extractNumbers(line);
-      const amounts = nums.filter((n) => n >= 0.01 && n < 1e10);
+      // ── Multi-line accumulation ──────────────────────────────────────────
+      // HDFC/SBI PDFs often wrap a transaction across 2-4 lines:
+      //   Line 1: date + narration start  (no amounts yet)
+      //   Line 2: narration continuation + ref no + value date + amounts
+      //   Line 3: more narration (optional)
+      // We collect up to 4 continuation lines so amounts always end up in
+      // the same "combined" string as the date.
+      let combined = line;
+      for (let k = 1; k <= 4; k++) {
+        if (i + k >= lines.length) break;
+        const next = lines[i + k];
+        if (datePattern.test(next)) break;   // next transaction starts → stop
+        if (isNoise(next)) break;
+        combined += " " + next;
+      }
+
+      // Strip ALL date-like tokens so their digit sequences (5, 1, 26, 2026…)
+      // are never mistaken for monetary amounts.
+      const clean = stripDates(combined);
+      const nums = extractNumbers(clean);
+
+      // Keep only amounts >= 1 (eliminates stray tiny fractions).
+      // Reference/cheque numbers (9+ digits, no decimal) are kept but they
+      // appear BEFORE the closing balance in the column order, so taking
+      // amounts[amounts.length - 1] still gives the correct closing balance.
+      const amounts = nums.filter((n) => n >= 1 && n < 1e12);
 
       if (amounts.length >= 2) {
         const closingBal = amounts[amounts.length - 1];
+
+        // Sanity: closing balance should be plausible (>= 0 after accounting for OD)
+        // and should not be a 9+ digit integer (likely a reference number).
+        const isRefNumber = Number.isInteger(closingBal) && closingBal > 1e8;
+        if (isRefNumber) continue;
+
         balances.push(closingBal);
 
         if (balances.length >= 2) {
           const prevBal = balances[balances.length - 2];
           const diff = closingBal - prevBal;
-          const narration = line + (i + 1 < lines.length ? " " + lines[i + 1] : "");
+          // Use the full combined text as narration for pattern matching
+          const narration = combined;
 
           if (diff > 0) {
             const credit = Math.abs(diff);
