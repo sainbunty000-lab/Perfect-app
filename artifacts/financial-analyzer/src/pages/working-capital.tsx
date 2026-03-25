@@ -10,12 +10,13 @@ import { exportToPDF } from "@/lib/pdf";
 import { ACCEPTED_EXTENSIONS, detectFormat, FORMAT_LABELS } from "@/lib/fileReader";
 import {
   UploadCloud, FileText, Calculator, Download, Save, Info,
-  CheckCircle, AlertTriangle, XCircle, FileImage, FileSpreadsheet,
-  Loader2, X, ChevronDown, ChevronUp,
+  CheckCircle, FileImage, FileSpreadsheet,
+  Loader2, X, ChevronDown, ChevronUp, Zap,
 } from "lucide-react";
 import { useCreateCase } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
+type PendingFile = { file: File; label: string };
 type UploadedFile = { file: File; label: string; fieldsExtracted: number };
 
 const formatIcon = (fmt: string) => {
@@ -27,10 +28,16 @@ const formatIcon = (fmt: string) => {
 
 export default function WorkingCapital() {
   const { toast } = useToast();
-  const [parsingBS, setParsingBS] = useState(false);
-  const [parsingPL, setParsingPL] = useState(false);
+
+  // Files selected but not yet parsed
+  const [pendingBS, setPendingBS] = useState<PendingFile | null>(null);
+  const [pendingPL, setPendingPL] = useState<PendingFile | null>(null);
+
+  // Files after parsing
   const [bsFile, setBsFile] = useState<UploadedFile | null>(null);
   const [plFile, setPlFile] = useState<UploadedFile | null>(null);
+
+  const [extracting, setExtracting] = useState(false);
   const [results, setResults] = useState<WorkingCapitalResults | null>(null);
   const [showManual, setShowManual] = useState(false);
   const bsInputRef = useRef<HTMLInputElement>(null);
@@ -47,6 +54,8 @@ export default function WorkingCapital() {
   });
 
   const formValues = watch();
+  const hasAnyPending = !!pendingBS || !!pendingPL;
+  const hasAnyParsed = !!bsFile || !!plFile;
 
   const mergeExtracted = (data: WorkingCapitalData) => {
     (Object.keys(data) as (keyof WorkingCapitalData)[]).forEach((key) => {
@@ -56,48 +65,80 @@ export default function WorkingCapital() {
     });
   };
 
-  const handleBSUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Step 1: Just store the selected file — don't parse yet
+  const handleBSSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setParsingBS(true);
-    try {
-      const extracted = await parseFinancialFile(file);
-      const bsFields: (keyof WorkingCapitalData)[] = [
-        "currentAssets", "currentLiabilities", "inventory",
-        "debtors", "creditors", "cash",
-      ];
-      let count = 0;
-      bsFields.forEach((k) => { if (extracted[k] !== undefined) { setValue(k, extracted[k] as number); count++; } });
-      mergeExtracted(extracted);
-      setBsFile({ file, label: FORMAT_LABELS[detectFormat(file)], fieldsExtracted: count });
-      toast({ title: "Balance Sheet Parsed", description: `Extracted ${count} field(s). Please verify values.` });
-    } catch {
-      toast({ title: "Parsing Failed", description: "Could not read the Balance Sheet. Try a different format or use manual input.", variant: "destructive" });
-    } finally {
-      setParsingBS(false);
-      if (bsInputRef.current) bsInputRef.current.value = "";
-    }
+    setPendingBS({ file, label: FORMAT_LABELS[detectFormat(file)] });
+    setBsFile(null);
+    if (bsInputRef.current) bsInputRef.current.value = "";
   };
 
-  const handlePLUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePLSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setParsingPL(true);
+    setPendingPL({ file, label: FORMAT_LABELS[detectFormat(file)] });
+    setPlFile(null);
+    if (plInputRef.current) plInputRef.current.value = "";
+  };
+
+  // Step 2: Extract button — parse all pending files
+  const handleExtract = async () => {
+    if (!pendingBS && !pendingPL) return;
+    setExtracting(true);
     try {
-      const extracted = await parseFinancialFile(file);
-      const plFields: (keyof WorkingCapitalData)[] = [
-        "sales", "cogs", "purchases", "expenses", "netProfit",
-      ];
-      let count = 0;
-      plFields.forEach((k) => { if (extracted[k] !== undefined) { setValue(k, extracted[k] as number); count++; } });
-      mergeExtracted(extracted);
-      setPlFile({ file, label: FORMAT_LABELS[detectFormat(file)], fieldsExtracted: count });
-      toast({ title: "P&L Statement Parsed", description: `Extracted ${count} field(s). Please verify values.` });
+      let totalFields = 0;
+
+      if (pendingBS) {
+        const extracted = await parseFinancialFile(pendingBS.file);
+        const bsFields: (keyof WorkingCapitalData)[] = [
+          "currentAssets", "currentLiabilities", "inventory",
+          "debtors", "creditors", "cash",
+        ];
+        let count = 0;
+        bsFields.forEach((k) => {
+          if (extracted[k] !== undefined && extracted[k] !== 0) {
+            setValue(k, extracted[k] as number);
+            count++;
+          }
+        });
+        mergeExtracted(extracted);
+        setBsFile({ file: pendingBS.file, label: pendingBS.label, fieldsExtracted: count });
+        setPendingBS(null);
+        totalFields += count;
+      }
+
+      if (pendingPL) {
+        const extracted = await parseFinancialFile(pendingPL.file);
+        const plFields: (keyof WorkingCapitalData)[] = [
+          "sales", "cogs", "purchases", "expenses", "netProfit",
+        ];
+        let count = 0;
+        plFields.forEach((k) => {
+          if (extracted[k] !== undefined && extracted[k] !== 0) {
+            setValue(k, extracted[k] as number);
+            count++;
+          }
+        });
+        mergeExtracted(extracted);
+        setPlFile({ file: pendingPL.file, label: pendingPL.label, fieldsExtracted: count });
+        setPendingPL(null);
+        totalFields += count;
+      }
+
+      setShowManual(true);
+      toast({
+        title: "Data Extracted",
+        description: `${totalFields} field(s) extracted. Verify values in Manual Input, then click Calculate Ratios.`,
+      });
     } catch {
-      toast({ title: "Parsing Failed", description: "Could not read the P&L statement. Try a different format or use manual input.", variant: "destructive" });
+      toast({
+        title: "Extraction Failed",
+        description: "Could not read one or more documents. Try a different format or use manual input.",
+        variant: "destructive",
+      });
     } finally {
-      setParsingPL(false);
-      if (plInputRef.current) plInputRef.current.value = "";
+      setExtracting(false);
     }
   };
 
@@ -127,9 +168,6 @@ export default function WorkingCapital() {
       onError: () => toast({ title: "Save Failed", description: "Could not save the case.", variant: "destructive" }),
     });
   };
-
-  const statusColor = (v: number | undefined, good: boolean) =>
-    v !== undefined && good ? "text-success" : "text-warning";
 
   return (
     <Layout>
@@ -162,10 +200,10 @@ export default function WorkingCapital() {
             color="blue"
             accept={ACCEPTED_EXTENSIONS}
             inputRef={bsInputRef}
-            isParsing={parsingBS}
+            pending={pendingBS}
             uploadedFile={bsFile}
-            onClear={() => setBsFile(null)}
-            onChange={handleBSUpload}
+            onClear={() => { setPendingBS(null); setBsFile(null); }}
+            onChange={handleBSSelect}
             formats={["PDF", "Excel", "JPEG/PNG", "TXT"]}
           />
 
@@ -176,12 +214,27 @@ export default function WorkingCapital() {
             color="teal"
             accept={ACCEPTED_EXTENSIONS}
             inputRef={plInputRef}
-            isParsing={parsingPL}
+            pending={pendingPL}
             uploadedFile={plFile}
-            onClear={() => setPlFile(null)}
-            onChange={handlePLUpload}
+            onClear={() => { setPendingPL(null); setPlFile(null); }}
+            onChange={handlePLSelect}
             formats={["PDF", "Excel", "JPEG/PNG", "TXT"]}
           />
+
+          {/* ── EXTRACT BUTTON (shown when files are pending) ── */}
+          {hasAnyPending && (
+            <button
+              onClick={handleExtract}
+              disabled={extracting}
+              className="w-full py-3 rounded-2xl bg-accent text-accent-foreground font-display font-semibold text-base hover:bg-accent/90 transition-all hover:shadow-lg hover:shadow-accent/30 flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {extracting ? (
+                <><Loader2 className="w-5 h-5 animate-spin" /> Extracting Data…</>
+              ) : (
+                <><Zap className="w-5 h-5" /> Extract Data from Documents</>
+              )}
+            </button>
+          )}
 
           {/* Calculate CTA */}
           <button
@@ -235,12 +288,17 @@ export default function WorkingCapital() {
               </div>
               <div className="text-center">
                 <p className="font-medium text-foreground/70">Upload documents or enter values</p>
-                <p className="text-sm mt-1">Then click "Calculate Ratios" to see results</p>
+                <p className="text-sm mt-1">
+                  {hasAnyPending
+                    ? 'Click "Extract Data from Documents" then "Calculate Ratios"'
+                    : hasAnyParsed
+                    ? 'Verify values in Manual Input, then click "Calculate Ratios"'
+                    : 'Then click "Calculate Ratios" to see results'}
+                </p>
               </div>
             </div>
           ) : (
             <>
-              {/* Eligibility Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="glass-card p-6 rounded-2xl border border-primary/40 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -translate-y-8 translate-x-8 blur-2xl" />
@@ -248,7 +306,7 @@ export default function WorkingCapital() {
                   <h2 className="text-4xl font-display font-black text-primary">
                     ₹{results.eligibilityAmount?.toLocaleString("en-IN")}
                   </h2>
-                  <p className="text-xs mt-2 text-foreground/50">75% of Working Capital</p>
+                  <p className="text-xs mt-2 text-foreground/50">75% of Net Working Capital</p>
                 </div>
                 <div className="glass-card p-6 rounded-2xl border border-border/50">
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Net Working Capital</p>
@@ -259,7 +317,6 @@ export default function WorkingCapital() {
                 </div>
               </div>
 
-              {/* Ratios */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <RatioCard title="Current Ratio" value={results.currentRatio} suffix="x" benchmark="> 1.33" good={results.currentRatio! >= 1.33} />
                 <RatioCard title="Quick Ratio" value={results.quickRatio} suffix="x" benchmark="> 1.0" good={results.quickRatio! >= 1} />
@@ -269,7 +326,6 @@ export default function WorkingCapital() {
                 <RatioCard title="Working Capital Cycle" value={results.workingCapitalCycle} suffix=" days" benchmark="Lower is better" good={results.workingCapitalCycle! < 60} />
               </div>
 
-              {/* Additional Metrics */}
               {(results.grossProfitMargin !== undefined || results.netProfitMargin !== undefined) && (
                 <div className="glass-card p-5 rounded-2xl border border-border/50">
                   <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Profitability</h3>
@@ -297,12 +353,13 @@ export default function WorkingCapital() {
   );
 }
 
-// ── Upload Card Component ─────────────────────────────────────────────────────
+// ── Upload Card ───────────────────────────────────────────────────────────────
 function UploadCard({
-  title, subtitle, color, accept, inputRef, isParsing, uploadedFile, onClear, onChange, formats,
+  title, subtitle, color, accept, inputRef, pending, uploadedFile, onClear, onChange, formats,
 }: {
   title: string; subtitle: string; color: "blue" | "teal"; accept: string;
-  inputRef: React.RefObject<HTMLInputElement>; isParsing: boolean;
+  inputRef: React.RefObject<HTMLInputElement>;
+  pending: { file: File; label: string } | null;
   uploadedFile: { file: File; label: string; fieldsExtracted: number } | null;
   onClear: () => void; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   formats: string[];
@@ -317,7 +374,7 @@ function UploadCard({
           <h3 className="font-display font-semibold text-sm">{title}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
         </div>
-        {uploadedFile && (
+        {(pending || uploadedFile) && (
           <button onClick={onClear} className="p-1 rounded-lg hover:bg-white/10 text-muted-foreground">
             <X className="w-4 h-4" />
           </button>
@@ -333,28 +390,28 @@ function UploadCard({
           </div>
           <CheckCircle className="w-5 h-5 text-success shrink-0" />
         </div>
+      ) : pending ? (
+        <div className="rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 flex items-center gap-3">
+          {formatIcon(detectFormat(pending.file))}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{pending.file.name}</p>
+            <p className="text-xs text-muted-foreground">{pending.label} · Ready to extract</p>
+          </div>
+          <Zap className="w-5 h-5 text-accent shrink-0" />
+        </div>
       ) : (
         <div className={`relative group cursor-pointer border-2 border-dashed border-border ${borderHover} rounded-xl p-6 text-center transition-colors bg-background/40`}>
           <input ref={inputRef} type="file" accept={accept} onChange={onChange}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-
-          {isParsing ? (
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className={`w-7 h-7 ${iconColor} animate-spin`} />
-              <p className="text-sm font-medium">Parsing document…</p>
-              <p className="text-xs text-muted-foreground">Extracting financial data</p>
+          <div className="flex flex-col items-center gap-2">
+            <UploadCloud className={`w-7 h-7 ${iconColor} group-hover:scale-110 transition-transform`} />
+            <p className="text-sm font-medium">Click or drag & drop</p>
+            <div className="flex flex-wrap justify-center gap-1 mt-1">
+              {formats.map((f) => (
+                <span key={f} className="text-[10px] bg-white/5 border border-border/50 px-2 py-0.5 rounded-full text-muted-foreground">{f}</span>
+              ))}
             </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <UploadCloud className={`w-7 h-7 ${iconColor} group-hover:scale-110 transition-transform`} />
-              <p className="text-sm font-medium">Click or drag & drop</p>
-              <div className="flex flex-wrap justify-center gap-1 mt-1">
-                {formats.map((f) => (
-                  <span key={f} className="text-[10px] bg-white/5 border border-border/50 px-2 py-0.5 rounded-full text-muted-foreground">{f}</span>
-                ))}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       )}
     </div>
@@ -391,12 +448,7 @@ function ManualSection({ title, fields, register, color }: {
 function RatioCard({ title, value, suffix = "", benchmark, good, neutral }: {
   title: string; value?: number; suffix?: string; benchmark: string; good?: boolean; neutral?: boolean;
 }) {
-  const color = neutral
-    ? "text-secondary"
-    : good
-    ? "text-success"
-    : "text-warning";
-
+  const color = neutral ? "text-secondary" : good ? "text-success" : "text-warning";
   return (
     <div className="glass-card p-4 rounded-xl border border-border/50">
       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">{title}</p>

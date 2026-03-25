@@ -50,10 +50,8 @@ function parseIndianNumber(raw: string): number | null {
   if (!raw) return null;
   const s = raw.trim();
 
-  // Parentheses notation → negative: (12,345) or (12,345.00)
   const inParens = /^\([\d,. ]+\)$/.test(s);
 
-  // Strip currency symbols, INR, Rs, ₹, parentheses, spaces
   let cleaned = s
     .replace(/[₹$€£]/g, "")
     .replace(/\bRs\.?\b/gi, "")
@@ -61,7 +59,6 @@ function parseIndianNumber(raw: string): number | null {
     .replace(/\s/g, "")
     .replace(/\(|\)/g, "");
 
-  // Remove ALL commas (handles both 1,23,456 and 1,234,567)
   cleaned = cleaned.replace(/,/g, "");
 
   const val = parseFloat(cleaned);
@@ -69,9 +66,7 @@ function parseIndianNumber(raw: string): number | null {
   return inParens ? -Math.abs(val) : val;
 }
 
-// Extract all numbers from a string (handles Indian format + parens)
 function extractNumbers(text: string): number[] {
-  // Match: (1,23,456.00) or -1,23,456.00 or 1,23,456.00
   const pattern = /\([\d,]+(?:\.\d+)?\)|-?[\d,]+(?:\.\d+)?/g;
   const results: number[] = [];
   let m: RegExpExecArray | null;
@@ -85,42 +80,42 @@ function extractNumbers(text: string): number[] {
 // ─────────────────────────────────────────────────────────────────────────────
 // BALANCE SHEET & P&L TEXT PARSER
 //
-// Real Indian financial statements come in many formats:
-// 1. Companies Act Schedule III  →  "Total Current Assets" as a summary line
-// 2. Proprietary/Partnership BS  →  Items listed individually, no summary line
-// 3. Trading & P&L Account       →  "By Gross Receipts", "To Net Profit" etc.
-// 4. Statement of Accounts       →  Combined income/expense with "By"/"To" prefix
+// KEY FIX: Position-aware extraction
+// In two-column Indian balance sheets, a single line may contain BOTH a
+// liability label+value AND an asset label+value, e.g.:
+//   "SUNDRY CREDITORS   1,43,827   SUNDRY DEBTORS   14,87,380"
 //
-// Strategy:
-//  - Try most specific / longest keyword match first
-//  - Check same line (rightmost significant number = value in right-aligned tables)
-//  - Check next 1–3 lines (values often follow label in PDF extraction)
-//  - For "total" lines use LAST match (totals appear after sub-items)
-//  - For items without "total" use FIRST match
+// Old approach: take LAST number on line → picks 14,87,380 for creditors (WRONG)
+// New approach: take the FIRST number that appears AFTER the matched keyword
+//               position in the line → picks 1,43,827 for creditors (CORRECT)
+//
+// Also fixes "CURRENT ASSETS" showing only bank/cash by ALWAYS summing all
+// asset components and taking whichever is larger (label vs sum).
 // ─────────────────────────────────────────────────────────────────────────────
 export function extractWorkingCapitalFromText(text: string): WorkingCapitalData {
   const data: WorkingCapitalData = {};
 
-  // Normalize: collapse multiple spaces, remove tab chars
   const normalized = text.replace(/\t/g, "  ").replace(/ {3,}/g, "   ");
-
   const lines = normalized
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
   /**
-   * findValue - core extraction function
-   * @param keywords       Ordered list of phrases to look for (case-insensitive)
-   * @param preferLast     Return the LAST candidate (useful for "total" lines)
-   * @param excludeKeywords Skip lines containing these phrases
-   * @param prefixFilter   Only match lines starting with this prefix (e.g. "by ", "to ")
+   * findValue — position-aware extraction
+   *
+   * For each line that matches a keyword:
+   *  1. Find the character position of the matched keyword
+   *  2. Extract numbers only from the text AFTER that position
+   *  3. Take the FIRST number after the keyword (not the last on the line)
+   *
+   * This correctly handles two-column PDFs where the same line has
+   * "CREDITOR_LABEL  value1   DEBTOR_LABEL  value2"
    */
   const findValue = (
     keywords: string[],
     preferLast = false,
     excludeKeywords: string[] = [],
-    prefixFilter?: string
   ): number | undefined => {
     const candidates: number[] = [];
 
@@ -128,37 +123,38 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
       const line = lines[i];
       const lower = line.toLowerCase();
 
-      // Prefix filter (e.g. lines starting with "by " in P&L credit side)
-      if (prefixFilter && !lower.startsWith(prefixFilter.toLowerCase())) {
-        // Also allow "   by gross receipts" (indented)
-        if (!lower.includes(prefixFilter.toLowerCase())) continue;
-      }
-
-      // Skip exclusion keywords
       if (excludeKeywords.some((ex) => lower.includes(ex.toLowerCase()))) continue;
 
-      // Check if any keyword matches
-      const matched = keywords.some((kw) => lower.includes(kw.toLowerCase()));
-      if (!matched) continue;
+      // Find which keyword matched AND its position in the line
+      let matchPos = -1;
+      let matchLen = 0;
+      for (const kw of keywords) {
+        const pos = lower.indexOf(kw.toLowerCase());
+        if (pos !== -1) {
+          matchPos = pos;
+          matchLen = kw.length;
+          break;
+        }
+      }
+      if (matchPos === -1) continue;
 
-      // Extract numbers from current line
-      const numsOnLine = extractNumbers(line);
-
-      // Also check next 1–3 lines (PDF text extraction often splits value to next line)
-      const nextLines = [1, 2, 3]
-        .map((d) => (i + d < lines.length ? lines[i + d] : ""))
-        .filter(Boolean);
+      // ── Position-aware: extract numbers from the text AFTER the keyword ──
+      const afterKeyword = line.slice(matchPos + matchLen);
+      const numsAfter = extractNumbers(afterKeyword);
+      const sigAfter = numsAfter.filter((n) => Math.abs(n) >= 1);
 
       let val: number | undefined;
 
-      if (numsOnLine.length > 0) {
-        // Use rightmost significant number (right-aligned accounting tables)
-        const sig = numsOnLine.filter((n) => Math.abs(n) >= 1);
-        val = sig.length > 0 ? sig[sig.length - 1] : numsOnLine[numsOnLine.length - 1];
+      if (sigAfter.length > 0) {
+        // First significant number after the keyword = the value for THIS label
+        val = sigAfter[0];
+      } else if (numsAfter.length > 0) {
+        val = numsAfter[0];
       } else {
-        // Look in next lines
-        for (const nl of nextLines) {
-          const nums = extractNumbers(nl);
+        // Check next 1–3 lines (values sometimes on the line below in PDFs)
+        for (let d = 1; d <= 3; d++) {
+          if (i + d >= lines.length) break;
+          const nums = extractNumbers(lines[i + d]);
           if (nums.length > 0) {
             val = Math.abs(nums[0]);
             break;
@@ -166,98 +162,112 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
         }
       }
 
-      if (val !== undefined && !isNaN(val)) {
-        candidates.push(val);
-      }
+      if (val !== undefined && !isNaN(val)) candidates.push(val);
     }
 
     if (candidates.length === 0) return undefined;
     return preferLast ? candidates[candidates.length - 1] : candidates[0];
   };
 
-  // ── BALANCE SHEET FIELDS ────────────────────────────────────────────────────
+  // ── BALANCE SHEET FIELDS ──────────────────────────────────────────────────
 
-  // Current Assets
-  // Try totals first (more specific), then individual labels
-  data.currentAssets =
+  // --- Individual components (always computed for the sum approach) ---
+  const compCash = findValue([
+    "bank and cash balance", "bank and cash balances",
+    "cash and bank balance", "cash and bank balances", "cash and bank",
+    "cash & bank", "cash and cash equivalents",
+    "balance with bank", "bank balance", "cash in hand", "cash balance",
+  ]);
+
+  const compDebtors = findValue([
+    "sundry debtors", "trade debtors", "trade receivables",
+    "accounts receivable", "book debts",
+    "debtors",
+  ], false, ["bad debts", "provision for doubtful", "doubtful"]);
+
+  const compInventory = findValue([
+    "closing stock", "closing inventory", "stock-in-trade",
+    "stock in trade", "inventories", "finished goods",
+    "raw material stock", "wip stock",
+  ]);
+
+  const compAdvances = findValue([
+    "loans & advances", "loans and advances",
+    "tds and tcs receivable", "tds receivable", "tcs receivable",
+    "advance to", "prepaid", "other current assets",
+  ]);
+
+  // Current Assets: take the MAX of (direct label) vs (sum of components)
+  // because proprietary BS often labels "CURRENT ASSETS" for only bank/cash
+  // while debtors and loans & advances are listed as separate sections
+  const caLabel =
     findValue(["total current assets"], true) ??
     findValue(["net current assets"], true) ??
-    findValue(["current assets", "ca "], true, [
-      "non-current", "non current", "fixed assets", "nca",
-    ]);
+    findValue(["current assets"], true, ["non-current", "non current", "fixed assets"]);
 
-  // If current assets still not found, try summing components
-  // (for proprietary balance sheets that don't have a "Total CA" line)
-  if (!data.currentAssets) {
-    const cash   = findValue(["bank and cash", "cash & bank", "cash and bank", "bank balance", "cash in hand", "cash equivalents"]);
-    const drs    = findValue(["sundry debtors", "trade receivables", "accounts receivable", "book debts", "debtors"]);
-    const inv    = findValue(["closing stock", "inventories", "inventory", "stock-in-trade"]);
-    const adv    = findValue(["loans & advances", "loans and advances", "advance to", "prepaid", "other current assets", "tds receivable", "tcs receivable"]);
-    if (cash || drs || inv) {
-      data.currentAssets = (cash || 0) + (drs || 0) + (inv || 0) + (adv || 0);
-    }
-  }
+  const caSum = (compCash || 0) + (compDebtors || 0) + (compInventory || 0) + (compAdvances || 0);
 
-  // Current Liabilities
-  data.currentLiabilities =
+  data.currentAssets = caSum > (caLabel || 0) ? caSum : (caLabel || caSum || undefined);
+
+  // --- Liabilities components ---
+  const compCreditors = findValue([
+    "sundry creditors", "trade creditors",
+    "trade payables", "accounts payable",
+    "creditors",
+  ], false, ["provision", "other payables"]);
+
+  // "OTHER PROVISION B/S" in Kalu Ram BS — look for the TOTAL provision line
+  const compProvisions = findValue([
+    "other provision b/s", "other provision",
+    "other current liabilities",
+    "provisions",
+    "accrued liabilities",
+  ]);
+
+  const compOD = findValue(["bank overdraft", "od payable", "cash credit"]);
+
+  // Salary payable, GST payable etc — only if no "other provision" total found
+  const compSalaryPayable = compProvisions
+    ? undefined
+    : findValue(["salary payable", "salaries payable"]);
+  const compGstPayable = compProvisions
+    ? undefined
+    : findValue(["gst payable", "gst liability"]);
+
+  const clLabel =
     findValue(["total current liabilities"], true) ??
-    findValue(["current liabilities", "current liability"], true, [
-      "non-current", "non current",
-    ]);
+    findValue(["current liabilities", "current liability"], true, ["non-current", "non current"]);
 
-  // If not found, sum creditors + provisions (proprietary balance sheets)
-  if (!data.currentLiabilities) {
-    const cr    = findValue(["sundry creditors", "trade payables", "accounts payable", "creditors"]);
-    const prov  = findValue(["other provision", "other current liabilities", "salary payable", "gst payable", "provisions", "accrued liabilities"]);
-    const od    = findValue(["bank overdraft", "od payable", "cash credit"]);
-    if (cr) {
-      data.currentLiabilities = (cr || 0) + (prov || 0) + (od || 0);
-    }
-  }
+  const clSum =
+    (compCreditors || 0) +
+    (compProvisions || 0) +
+    (compSalaryPayable || 0) +
+    (compGstPayable || 0) +
+    (compOD || 0);
 
-  // Inventory
-  data.inventory =
-    findValue(["closing stock", "closing inventory"]) ??
-    findValue(["stock-in-trade", "stock in trade"]) ??
-    findValue(["inventories", "finished goods", "raw material stock", "wip stock"], true) ??
-    findValue(["inventory"], true, ["plant", "equipment", "fixed"]);
+  data.currentLiabilities =
+    clLabel ??
+    (clSum > 0 ? clSum : undefined);
 
-  // Debtors / Accounts Receivable
-  data.debtors =
-    findValue(["sundry debtors"]) ??        // Most common in Indian BS
-    findValue(["trade debtors"]) ??
-    findValue(["trade receivables"]) ??
-    findValue(["accounts receivable"]) ??
-    findValue(["book debts"]) ??
-    findValue(["debtors"], false, ["bad debts", "provision for doubtful", "doubtful"]);
+  // Inventory (set individually too)
+  data.inventory = compInventory;
 
-  // Creditors / Accounts Payable
-  data.creditors =
-    findValue(["sundry creditors"]) ??      // Most common in Indian BS
-    findValue(["trade creditors"]) ??
-    findValue(["trade payables"]) ??
-    findValue(["accounts payable"]) ??
-    findValue(["creditors"], false, ["provision", "other payables"]);
+  // Debtors
+  data.debtors = compDebtors;
 
-  // Cash & Bank Balance
-  data.cash =
-    findValue(["bank and cash balances", "bank and cash balance"]) ??
-    findValue(["cash and bank balances", "cash and bank balance", "cash and bank"]) ??
-    findValue(["cash & bank balances", "cash & bank"]) ??
-    findValue(["cash and cash equivalents"]) ??
-    findValue(["balance with bank", "bank balance"]) ??
-    findValue(["cash in hand"]) ??
-    findValue(["cash balance"]);
+  // Creditors
+  data.creditors = compCreditors;
 
-  // ── P&L / INCOME STATEMENT FIELDS ────────────────────────────────────────
+  // Cash
+  data.cash = compCash;
+
+  // ── P&L FIELDS ────────────────────────────────────────────────────────────
 
   // Revenue / Sales
-  // Real Indian formats: "By Gross Receipts", "Net Revenue from Operations",
-  //                      "Net Sales", "Turnover", "Revenue from Operations"
   data.sales =
     findValue(["net revenue from operations", "revenue from operations"], true) ??
-    findValue(["gross receipts"], true) ??          // Proprietor P&L: "By Gross Receipts"
-    findValue(["by gross receipts"], true) ??        // Explicit "By" prefix format
+    findValue(["gross receipts"], true) ??
+    findValue(["by gross receipts"], true) ??
     findValue(["net sales", "net turnover"], true) ??
     findValue(["total revenue", "gross revenue", "total income from operations"], true, [
       "other income", "finance income", "cost",
@@ -281,19 +291,18 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
     findValue(["raw material consumed", "material consumed", "raw materials consumed"], true) ??
     findValue(["purchases"], true, ["capital purchase", "asset purchase", "fixed asset"]);
 
-  // Operating Expenses / Total Expenses
+  // Operating Expenses
   data.expenses =
     findValue(["total operating expenses", "total expenses"], true, ["cost of goods", "cost of sales"]) ??
     findValue(["operating expenses", "opex"], true) ??
     findValue(["indirect expenses", "administrative expenses", "general expenses"], true);
 
   // Net Profit
-  // Formats: "To Net Profit", "Profit after Tax", "Net Profit", "PAT"
   data.netProfit =
     findValue(["profit for the period", "profit for the year"], true) ??
     findValue(["profit after tax (pat)", "profit after tax"], true) ??
     findValue(["net profit after tax"], true) ??
-    findValue(["to net profit"], true) ??           // Proprietary P&L: "To Net Profit"
+    findValue(["to net profit"], true) ??
     findValue(["net profit"], true, ["gross profit", "operating profit", "before tax"]) ??
     findValue(["net income"], true, ["gross"]) ??
     findValue(["profit/(loss) for", "profit / (loss) for"], true);
@@ -303,86 +312,49 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BANK STATEMENT CSV PARSER
-// Handles multiple bank CSV formats (HDFC, SBI, ICICI, Axis, etc.)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const LARGE_TXN_THRESHOLD = 500000; // ₹5 Lakh
+const LARGE_TXN_THRESHOLD = 500000;
 
-// Transaction classification keyword maps
-// Based on real Indian bank statement narration formats
 const KEYWORD_MAPS = {
-  // UPI transactions (very common)
   upi: ["upi/", "upi-", "upi cr", "upi dr", "phonepe", "gpay", "googlepay",
         "paytm", "bhim", "amazon pay", "airtel money", "@ybl", "@okaxis",
         "@okhdfcbank", "@oksbi", "@axl", "@ptys", "cbdc"],
-
-  // RTGS / NEFT / IMPS transfers
   rtgsNeft: ["rtgs", "neft", "imps", "inward neft", "outward rtgs",
              "rbi neft", "neft cr", "neft dr", "imps cr", "ft-", "fund transfer"],
-
-  // ECS / NACH / EMI auto-debits
   ecs: ["ecs", "nach", "ach d-", "ach cr", "si-", "standing instruction",
         "auto debit", "mandate", "si dr", "nach dr", "direct debit"],
-
-  // Loan repayments
   loan: ["loan repay", "loan emi", "hl emi", "car loan", "home loan",
          "term loan", "emi-", "loan-", "housing loan", "emi repay",
          "loan installment", "lic premium"],
-
-  // Salary credits
   salary: ["salary", "sal credit", "sal cr", "payroll", "sal-", "wages",
            "staff salary", "employee pay"],
-
-  // Cheque clearing deposits (inward clearing)
   chequeDeposit: ["clg", "clearing", "chq dep", "cheque dep", "chq cr",
                   "clg cr", "inward clg", "clearing credit"],
-
-  // Cheque returns / bounces
   chequeBounce: ["bounce", "returned", "chq ret", "cheque ret",
                  "dishonour", "dishonored", "insufficient", "inward ret",
                  "unpaid chq", "cheque return", "dishonourd"],
-
-  // Cash deposits
   cashDeposit: ["cash dep", "cash deposit", "cash cr", "atm dep",
-                "counter dep", "cd-", "cash deposi", "atm deposit",
-                "cash in"],
-
-  // Cash withdrawals / ATM
+                "counter dep", "cd-", "cash deposi", "atm deposit", "cash in"],
   cashWithdrawal: ["cash wdl", "cash withdrawal", "atm wd", "atm withdrawal",
-                   "cash payment", "cw-", "atm-", "atm cash", "atm dr",
-                   "cash dr"],
-
-  // Interest credits (received by customer)
+                   "cash payment", "cw-", "atm-", "atm cash", "atm dr", "cash dr"],
   interestCredit: ["int cr", "interest cr", "interest credit", "int earned",
                    "savings interest", "fd interest", "interest on deposit",
                    "interest credited"],
-
-  // Interest debits (charged to customer — OD/loan interest)
   interestDebit: ["int dr", "interest dr", "interest debit", "int charged",
                   "od int dr", "interest on od", "interest on cc",
                   "loan interest", "int on loan"],
-
-  // Bank service charges / fees
   bankCharges: ["sms charges", "maintenance charge", "annual fee",
                 "demat charges", "service charge", "bank charge",
                 "processing fee", "penalty", "gst charge", "locker charge",
                 "dd charges", "chq book", "atm charge", "issuance fee",
                 "annual maintenance"],
-
-  // GST / Tax payments
   gstTax: ["gst", "tds", "tax payment", "income tax", "advance tax",
-           "cbdt", "customs duty", "service tax", "itns", "challan",
-           "gst payable", "tds payable"],
-
-  // Vendor / supplier payments
+           "cbdt", "customs duty", "service tax", "itns", "challan"],
   vendor: ["vendor", "supplier", "trade payment", "purchase payment",
            "party payment", "vendor pay"],
-
-  // Inward remittances / transfers in
   inward: ["inward", "inward rem", "incoming", "transfer in", "fund rcvd",
            "money received", "inward transfer", "foreign inward"],
-
-  // Outward payments / transfers out
   outward: ["outward", "outward rem", "outgoing", "transfer out",
             "payment to", "outward transfer"],
 };
@@ -419,7 +391,6 @@ export function parseBankingCsv(file: File): Promise<BankingData> {
 
         const headers = Object.keys(results.data[0]);
 
-        // ── Column Detection (handles many bank formats) ─────────────────
         const creditCol = detectColumn(headers, [
           "credit", "credits", "deposit", "deposits", "cr amount",
           "credit amount", "cr amt", "deposit amt", "deposit amount",
@@ -439,7 +410,6 @@ export function parseBankingCsv(file: File): Promise<BankingData> {
           "transaction details", "details", "transaction narration",
           "transaction remark", "narration/chq. no.",
         ]);
-        // Single amount column fallback (some banks have one signed amount column)
         const amtCol =
           !creditCol && !debitCol
             ? detectColumn(headers, ["amount", "transaction amount", "txn amount"])
@@ -449,7 +419,6 @@ export function parseBankingCsv(file: File): Promise<BankingData> {
             ? detectColumn(headers, ["type", "dr/cr", "cr/dr", "txn type", "transaction type", "debit/credit"])
             : undefined;
 
-        // ── Accumulators ─────────────────────────────────────────────────
         let totalCredits = 0, totalDebits = 0;
         let cashDeposits = 0, cashWithdrawals = 0;
         let chequeDeposits = 0, chequeReturns = 0;
@@ -466,7 +435,6 @@ export function parseBankingCsv(file: File): Promise<BankingData> {
 
         results.data.forEach((row) => {
           const desc = descCol ? (row[descCol] ?? "") : "";
-
           let credit = 0, debit = 0;
 
           if (creditCol || debitCol) {
@@ -477,7 +445,7 @@ export function parseBankingCsv(file: File): Promise<BankingData> {
             const type = (row[typeCol] ?? "").toLowerCase().trim();
             if (["cr", "credit", "c", "in", "deposit"].some(t => type === t || type.startsWith(t))) {
               credit = amt;
-            } else if (["dr", "debit", "d", "out", "withdrawal"].some(t => type === t || type.startsWith(t))) {
+            } else {
               debit = amt;
             }
           } else if (amtCol) {
@@ -487,25 +455,16 @@ export function parseBankingCsv(file: File): Promise<BankingData> {
             }
           }
 
-          // Balance
           const rawBal = balCol ? parseIndianNumber(row[balCol] ?? "") : null;
           const bal = rawBal !== null ? rawBal : 0;
           if (bal !== 0 || balances.length > 0) balances.push(bal);
-
-          // Overdraft detection (negative balance)
           if (bal < 0) overdraftUsage += Math.abs(bal);
-
-          // Large transactions
-          if (credit > LARGE_TXN_THRESHOLD || debit > LARGE_TXN_THRESHOLD) {
-            largeTransactions++;
-          }
+          if (credit > LARGE_TXN_THRESHOLD || debit > LARGE_TXN_THRESHOLD) largeTransactions++;
 
           totalCredits += credit;
           totalDebits  += debit;
 
-          // ── Classify by description ───────────────────────────────────
-          const d = desc; // original case for matching
-
+          const d = desc;
           if (descriptionMatches(d, KEYWORD_MAPS.salary))        salaryCredits    += credit;
           if (descriptionMatches(d, KEYWORD_MAPS.ecs))           ecsEmiPayments   += debit;
           if (descriptionMatches(d, KEYWORD_MAPS.loan))          loanRepayments   += debit;
@@ -524,7 +483,6 @@ export function parseBankingCsv(file: File): Promise<BankingData> {
           if (descriptionMatches(d, KEYWORD_MAPS.outward))       outwardPayments  += debit;
         });
 
-        // ── Balance Stats ─────────────────────────────────────────────────
         const openingBalance = balances.length > 0 ? balances[0] : 0;
         const closingBalance = balances.length > 0 ? balances[balances.length - 1] : 0;
         const minimumBalance = balances.length > 0 ? Math.min(...balances) : 0;
@@ -565,17 +523,10 @@ export function parseBankingCsv(file: File): Promise<BankingData> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BANK STATEMENT TEXT PARSER (PDF-extracted text format)
-// Handles HDFC, SBI, ICICI, Axis, PNB multi-line narration format
-//
-// Real HDFC text format:
-//   Date | Narration | Ref No | Value Dt | Withdrawal Amt. | Deposit Amt. | Closing Balance
-//
-// Key challenge: narrations span multiple lines in PDF extraction
-// Strategy: detect header row, then parse each transaction block
+// BANK STATEMENT TEXT PARSER (PDF-extracted format)
+// Handles HDFC, SBI, ICICI, Axis multi-line narration format
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Bank-specific narration patterns for text statements
 const TEXT_NARRATION_PATTERNS = {
   upi:          /\bupi[-/]/i,
   imps:         /\bimps[-/]/i,
@@ -594,26 +545,18 @@ const TEXT_NARRATION_PATTERNS = {
 
 function parseTextBankStatement(text: string): Partial<BankingData> {
   const data: Partial<BankingData> = {
-    totalCredits: 0,
-    totalDebits: 0,
-    cashDeposits: 0,
-    cashWithdrawals: 0,
-    chequeDeposits: 0,
-    chequeReturns: 0,
-    ecsEmiPayments: 0,
-    loanRepayments: 0,
-    interestCredits: 0,
-    interestDebits: 0,
-    bankCharges: 0,
-    upiTransactions: 0,
-    rtgsNeftTransfers: 0,
-    salaryCredits: 0,
+    totalCredits: 0, totalDebits: 0,
+    cashDeposits: 0, cashWithdrawals: 0,
+    chequeDeposits: 0, chequeReturns: 0,
+    ecsEmiPayments: 0, loanRepayments: 0,
+    interestCredits: 0, interestDebits: 0,
+    bankCharges: 0, upiTransactions: 0,
+    rtgsNeftTransfers: 0, salaryCredits: 0,
     largeTransactions: 0,
   };
 
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
-  // ── Method 1: Look for labeled totals (summary section in statement) ──
   const findSummary = (keywords: string[]): number | undefined => {
     for (let i = 0; i < lines.length; i++) {
       const lower = lines[i].toLowerCase();
@@ -630,20 +573,17 @@ function parseTextBankStatement(text: string): Partial<BankingData> {
     return undefined;
   };
 
-  data.openingBalance   = findSummary(["opening balance", "op bal", "op. balance", "balance b/f", "balance b/d"]);
-  data.closingBalance   = findSummary(["closing balance", "cl bal", "cl. balance", "balance c/f", "balance c/d"]);
-  data.totalCredits     = findSummary(["total credits", "total cr", "total deposits", "total deposit"]);
-  data.totalDebits      = findSummary(["total debits", "total dr", "total withdrawals", "total withdrawal"]);
-  data.averageBalance   = findSummary(["average balance", "avg balance", "avg bal", "average monthly balance"]);
-  data.minimumBalance   = findSummary(["minimum balance", "min balance", "min bal", "minimum monthly balance"]);
-  data.overdraftUsage   = findSummary(["overdraft", "od utilisation", "od limit used", "od availed"]);
-  data.loanRepayments   = findSummary(["loan repayment", "emi repaid", "loan emi"]);
-  data.bankCharges      = findSummary(["bank charges", "service charges", "total charges"]);
+  data.openingBalance = findSummary(["opening balance", "op bal", "op. balance", "balance b/f", "balance b/d"]);
+  data.closingBalance = findSummary(["closing balance", "cl bal", "cl. balance", "balance c/f", "balance c/d"]);
+  data.totalCredits   = findSummary(["total credits", "total cr", "total deposits", "total deposit"]);
+  data.totalDebits    = findSummary(["total debits", "total dr", "total withdrawals", "total withdrawal"]);
+  data.averageBalance = findSummary(["average balance", "avg balance", "avg bal", "average monthly balance"]);
+  data.minimumBalance = findSummary(["minimum balance", "min balance", "min bal", "minimum monthly balance"]);
+  data.overdraftUsage = findSummary(["overdraft", "od utilisation", "od limit used", "od availed"]);
+  data.loanRepayments = findSummary(["loan repayment", "emi repaid", "loan emi"]);
+  data.bankCharges    = findSummary(["bank charges", "service charges", "total charges"]);
 
-  // ── Method 2: Transaction-level parsing ───────────────────────────────
-  // Look for rows that have amounts in withdrawal/deposit columns
-  // HDFC format: Date ... Withdrawal Amt. ... Deposit Amt. ... Closing Balance
-  // Pattern: detect header row with "withdrawal" and "deposit" or similar
+  // Transaction-level parsing via balance-difference method
   let headerIdx = -1;
   for (let i = 0; i < lines.length; i++) {
     const lower = lines[i].toLowerCase();
@@ -657,88 +597,61 @@ function parseTextBankStatement(text: string): Partial<BankingData> {
     }
   }
 
-  // If header found, try to parse transactions
   const balances: number[] = [];
-
   if (data.openingBalance) balances.push(data.openingBalance);
 
   if (headerIdx >= 0) {
-    // Parse lines after header looking for transaction amounts
-    // HDFC: amount patterns are large numbers. Date is DD/MM/YY format.
     const datePattern = /^\d{2}\/\d{2}\/\d{2,4}/;
 
     for (let i = headerIdx + 1; i < lines.length; i++) {
       const line = lines[i];
       const lower = line.toLowerCase();
 
-      // Skip page headers, footers, bank metadata
       if (
-        lower.includes("page no") ||
-        lower.includes("hdfc bank") ||
-        lower.includes("registered office") ||
-        lower.includes("state account") ||
-        lower.includes("contents of this") ||
-        lower.includes("account branch") ||
-        lower.includes("from :") ||
-        lower.includes("statement of account")
+        lower.includes("page no") || lower.includes("hdfc bank") ||
+        lower.includes("registered office") || lower.includes("state account") ||
+        lower.includes("contents of this") || lower.includes("account branch") ||
+        lower.includes("from :") || lower.includes("statement of account")
       ) continue;
 
-      // A transaction line starts with a date
-      const isDateLine = datePattern.test(line);
+      if (!datePattern.test(line)) continue;
 
-      if (isDateLine) {
-        const nums = extractNumbers(line);
+      const nums = extractNumbers(line);
+      const amounts = nums.filter((n) => n >= 0.01 && n < 1e10);
 
-        // For HDFC text: date line has ref no (long digit string) + amounts
-        // Filter: transaction amounts are usually > 1 (exclude ref numbers which are huge)
-        // Closing balance is the LAST significant number on the line
-        const amounts = nums.filter((n) => n >= 0.01 && n < 1e10);
+      if (amounts.length >= 2) {
+        const closingBal = amounts[amounts.length - 1];
+        balances.push(closingBal);
 
-        if (amounts.length >= 2) {
-          // Last number = closing balance
-          const closingBal = amounts[amounts.length - 1];
-          balances.push(closingBal);
+        if (balances.length >= 2) {
+          const prevBal = balances[balances.length - 2];
+          const diff = closingBal - prevBal;
+          const narration = line + (i + 1 < lines.length ? " " + lines[i + 1] : "");
 
-          // Try to detect if it's a debit or credit
-          // If balance increased → credit; if decreased → debit
-          if (balances.length >= 2) {
-            const prevBal = balances[balances.length - 2];
-            const diff = closingBal - prevBal;
-            const narration = line + (i + 1 < lines.length ? " " + lines[i + 1] : "");
-
-            if (diff > 0) {
-              // Credit transaction
-              const credit = Math.abs(diff);
-              data.totalCredits! += credit;
-
-              if (TEXT_NARRATION_PATTERNS.upi.test(narration)) data.upiTransactions! += credit;
-              else if (TEXT_NARRATION_PATTERNS.neft.test(narration) || TEXT_NARRATION_PATTERNS.imps.test(narration)) data.rtgsNeftTransfers! += credit;
-              else if (TEXT_NARRATION_PATTERNS.salary.test(narration)) data.salaryCredits! += credit;
-              else if (TEXT_NARRATION_PATTERNS.chequeClr.test(narration)) data.chequeDeposits! += credit;
-              else if (TEXT_NARRATION_PATTERNS.cashDep.test(narration)) data.cashDeposits! += credit;
-              else if (TEXT_NARRATION_PATTERNS.interest.test(narration) && /int cr|interest cr/i.test(narration)) data.interestCredits! += credit;
-
-              if (credit >= LARGE_TXN_THRESHOLD) data.largeTransactions!++;
-            } else if (diff < 0) {
-              // Debit transaction
-              const debit = Math.abs(diff);
-              data.totalDebits! += debit;
-
-              if (TEXT_NARRATION_PATTERNS.upi.test(narration)) data.upiTransactions! += debit;
-              else if (TEXT_NARRATION_PATTERNS.ach.test(narration)) data.ecsEmiPayments! += debit;
-              else if (TEXT_NARRATION_PATTERNS.cashWdl.test(narration)) data.cashWithdrawals! += debit;
-              else if (TEXT_NARRATION_PATTERNS.interest.test(narration)) data.interestDebits! += debit;
-              else if (TEXT_NARRATION_PATTERNS.chequeBounce.test(narration)) data.chequeReturns!++;
-
-              if (debit >= LARGE_TXN_THRESHOLD) data.largeTransactions!++;
-            }
+          if (diff > 0) {
+            const credit = Math.abs(diff);
+            data.totalCredits! += credit;
+            if (TEXT_NARRATION_PATTERNS.upi.test(narration)) data.upiTransactions! += credit;
+            else if (TEXT_NARRATION_PATTERNS.neft.test(narration) || TEXT_NARRATION_PATTERNS.imps.test(narration)) data.rtgsNeftTransfers! += credit;
+            else if (TEXT_NARRATION_PATTERNS.salary.test(narration)) data.salaryCredits! += credit;
+            else if (TEXT_NARRATION_PATTERNS.chequeClr.test(narration)) data.chequeDeposits! += credit;
+            else if (TEXT_NARRATION_PATTERNS.cashDep.test(narration)) data.cashDeposits! += credit;
+            if (credit >= LARGE_TXN_THRESHOLD) data.largeTransactions!++;
+          } else if (diff < 0) {
+            const debit = Math.abs(diff);
+            data.totalDebits! += debit;
+            if (TEXT_NARRATION_PATTERNS.upi.test(narration)) data.upiTransactions! += debit;
+            else if (TEXT_NARRATION_PATTERNS.ach.test(narration)) data.ecsEmiPayments! += debit;
+            else if (TEXT_NARRATION_PATTERNS.cashWdl.test(narration)) data.cashWithdrawals! += debit;
+            else if (TEXT_NARRATION_PATTERNS.interest.test(narration)) data.interestDebits! += debit;
+            else if (TEXT_NARRATION_PATTERNS.chequeBounce.test(narration)) data.chequeReturns!++;
+            if (debit >= LARGE_TXN_THRESHOLD) data.largeTransactions!++;
           }
         }
       }
     }
   }
 
-  // Compute balance stats from collected balances
   if (balances.length > 0) {
     if (!data.openingBalance) data.openingBalance = balances[0];
     if (!data.closingBalance)  data.closingBalance  = balances[balances.length - 1];
@@ -746,12 +659,15 @@ function parseTextBankStatement(text: string): Partial<BankingData> {
     if (!data.averageBalance)  data.averageBalance  = Math.round(
       balances.reduce((a, b) => a + b, 0) / balances.length
     );
-    // Check for overdraft
     const negBals = balances.filter(b => b < 0);
     if (!data.overdraftUsage && negBals.length > 0) {
       data.overdraftUsage = Math.abs(Math.min(...negBals));
     }
   }
+
+  // Round all computed totals
+  if (data.totalCredits) data.totalCredits = Math.round(data.totalCredits);
+  if (data.totalDebits)  data.totalDebits  = Math.round(data.totalDebits);
 
   data.transactionFrequency = balances.length > 0 ? balances.length - 1 : 0;
 
@@ -764,15 +680,11 @@ function parseTextBankStatement(text: string): Partial<BankingData> {
 export async function parseBankFile(file: File): Promise<Partial<BankingData>> {
   const name = file.name.toLowerCase();
 
-  if (name.endsWith(".csv")) {
-    return parseBankingCsv(file);
-  }
+  if (name.endsWith(".csv")) return parseBankingCsv(file);
 
-  // For PDF, Excel, Image — extract text first via fileReader
   const { extractTextFromFile } = await import("./fileReader");
   const text = await extractTextFromFile(file);
 
-  // Detect CSV-like structure: header row with commas
   const firstFewLines = text.split("\n").slice(0, 5).join("\n");
   const commaCount = (firstFewLines.match(/,/g) || []).length;
   const hasCsvHeader =
@@ -783,18 +695,15 @@ export async function parseBankFile(file: File): Promise<Partial<BankingData>> {
      firstFewLines.toLowerCase().includes("credit"));
 
   if (hasCsvHeader) {
-    // Parse as CSV via blob
     const csvBlob = new File([text], "statement.csv", { type: "text/csv" });
     return parseBankingCsv(csvBlob);
   }
 
-  // Plain text / PDF-extracted text
   return parseTextBankStatement(text);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Auto-detect and parse Balance Sheet / P&L
-// Supports: PDF, Excel, JPEG/PNG (OCR), TXT, CSV
 // ─────────────────────────────────────────────────────────────────────────────
 export async function parseFinancialFile(file: File): Promise<WorkingCapitalData> {
   const { extractTextFromFile } = await import("./fileReader");
@@ -802,7 +711,6 @@ export async function parseFinancialFile(file: File): Promise<WorkingCapitalData
   return extractWorkingCapitalFromText(text);
 }
 
-// Parse text directly (used when caller already extracted text)
 export function parseFinancialText(text: string): WorkingCapitalData {
   return extractWorkingCapitalFromText(text);
 }
