@@ -4,6 +4,7 @@
  */
 
 import { Platform } from "react-native";
+import { normalizeFields } from "./fieldMapper";
 
 function getApiBase(): string {
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
@@ -100,10 +101,12 @@ export async function parseFinancialDocument<T = Record<string, unknown>>(
   }
 
   const data = await resp.json();
+  const rawFields  = (data.fields ?? {}) as Record<string, unknown>;
+  const normalized = normalizeFields(rawFields as Record<string, any>, docType);
   return {
     text:   data.text   ?? "",
     format: (data.format as ParseFormat) ?? fmt,
-    fields: (data.fields ?? {}) as T,
+    fields: normalized as T,
   };
 }
 

@@ -83,23 +83,31 @@ export default function BankingScreen() {
     setParsing(true);
     try {
       const parsed = await parseFinancialDocument(asset.uri, asset.name, asset.mimeType ?? undefined, "banking");
+      // normalizeFields already applied in parseViaApi — all keys match BankingData
       const f = parsed.fields as any;
       setData((d) => ({
         ...d,
-        ...(f.totalCredits         !== undefined && { totalCredits:         f.totalCredits }),
-        ...(f.totalDebits          !== undefined && { totalDebits:          f.totalDebits }),
-        ...(f.averageBalance       !== undefined && { averageBalance:       f.averageBalance }),
-        ...(f.minimumBalance       !== undefined && { minimumBalance:       f.minimumBalance }),
-        ...(f.openingBalance       !== undefined && { openingBalance:       f.openingBalance }),
-        ...(f.closingBalance       !== undefined && { closingBalance:       f.closingBalance }),
-        ...(f.cashDeposits         !== undefined && { cashDeposits:         f.cashDeposits }),
-        ...(f.chequeReturns        !== undefined && { chequeReturns:        f.chequeReturns }),
-        ...(f.loanRepayments       !== undefined && { loanRepayments:       f.loanRepayments }),
-        ...(f.overdraftUsage       !== undefined && { overdraftUsage:       f.overdraftUsage }),
-        ...(f.ecsEmiPayments       !== undefined && { ecsEmiPayments:       f.ecsEmiPayments }),
-        ...(f.transactionFrequency !== undefined && { transactionFrequency: f.transactionFrequency }),
+        ...(f.totalCredits         != null && { totalCredits:         f.totalCredits }),
+        ...(f.totalDebits          != null && { totalDebits:          f.totalDebits }),
+        ...(f.averageBalance       != null && { averageBalance:       f.averageBalance }),
+        ...(f.minimumBalance       != null && { minimumBalance:       f.minimumBalance }),
+        ...(f.openingBalance       != null && { openingBalance:       f.openingBalance }),
+        ...(f.closingBalance       != null && { closingBalance:       f.closingBalance }),
+        ...(f.cashDeposits         != null && { cashDeposits:         f.cashDeposits }),
+        ...(f.chequeReturns        != null && { chequeReturns:        f.chequeReturns }),
+        ...(f.loanRepayments       != null && { loanRepayments:       f.loanRepayments }),
+        ...(f.overdraftUsage       != null && { overdraftUsage:       f.overdraftUsage }),
+        ...(f.ecsEmiPayments       != null && { ecsEmiPayments:       f.ecsEmiPayments }),
+        ...(f.transactionFrequency != null && { transactionFrequency: f.transactionFrequency }),
+        ...(f.salaryCredits        != null && { salaryCredits:        f.salaryCredits }),
+        ...(f.interestCredits      != null && { interestCredits:      f.interestCredits }),
+        ...(f.interestDebits       != null && { interestDebits:       f.interestDebits }),
+        ...(f.bankCharges          != null && { bankCharges:          f.bankCharges }),
+        ...(f.upiTransactions      != null && { upiTransactions:      f.upiTransactions }),
+        ...(f.rtgsNeftTransfers    != null && { rtgsNeftTransfers:    f.rtgsNeftTransfers }),
+        ...(f.largeTransactions    != null && { largeTransactions:    f.largeTransactions }),
       }));
-      setSlotState({ name: asset.name, format: FORMAT_LABEL[parsed.format], bankName: f.bankName, period: f.statementPeriod });
+      setSlotState({ name: asset.name, format: FORMAT_LABEL[parsed.format], bankName: f.bankName ?? f.bank ?? "", period: f.statementPeriod ?? f.period ?? "" });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: any) {
       Alert.alert("Parse Failed", e?.message ?? "Could not read the file. Try a CSV or PDF statement.");

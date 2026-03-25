@@ -84,20 +84,35 @@ export default function WorkingCapitalScreen() {
     const asset        = section === "bs" ? bsAsset : plAsset;
     const setParsing   = section === "bs" ? setBsParsing : setPlParsing;
     const setSlot      = section === "bs" ? setBsSlot    : setPlSlot;
-    const bsKeys: (keyof WorkingCapitalData)[] = ["currentAssets","currentLiabilities","inventory","debtors","creditors","cash"];
-    const plKeys: (keyof WorkingCapitalData)[] = ["sales","cogs","purchases","expenses","netProfit"];
-    const relevantKeys = section === "bs" ? bsKeys : plKeys;
     if (!asset) return;
 
     setParsing(true);
     try {
       const docType = section === "bs" ? "balance_sheet" : "profit_loss";
       const parsed  = await parseFinancialDocument(asset.uri, asset.name, asset.mimeType ?? undefined, docType);
-      const fields  = parsed.fields as any;
+      const f = parsed.fields as any;
+
+      // After normalizeFields the keys already match WorkingCapitalData.
+      // We pick only the fields relevant to this section so BS parse doesn't
+      // overwrite PL fields and vice-versa.
       const merged: Partial<WorkingCapitalData> = {};
-      for (const key of relevantKeys) {
-        if (fields[key] !== undefined) merged[key] = fields[key];
+      if (section === "bs") {
+        if (f.currentAssets       != null) merged.currentAssets       = f.currentAssets;
+        if (f.currentLiabilities  != null) merged.currentLiabilities  = f.currentLiabilities;
+        if (f.inventory           != null) merged.inventory           = f.inventory;
+        if (f.debtors             != null) merged.debtors             = f.debtors;
+        if (f.creditors           != null) merged.creditors           = f.creditors;
+        if (f.cash                != null) merged.cash                = f.cash;
+      } else {
+        if (f.sales               != null) merged.sales               = f.sales;
+        if (f.cogs                != null) merged.cogs                = f.cogs;
+        if (f.purchases           != null) merged.purchases           = f.purchases;
+        if (f.expenses            != null) merged.expenses            = f.expenses;
+        if (f.netProfit           != null) merged.netProfit           = f.netProfit;
+        // Fallback: if cogs absent but purchases present, use purchases as cogs
+        if (merged.cogs == null && f.purchases != null) merged.cogs   = f.purchases;
       }
+
       setSlot({ name: asset.name, format: FORMAT_LABEL[parsed.format] });
       if (Object.keys(merged).length > 0) {
         setData((d) => ({ ...d, ...merged }));

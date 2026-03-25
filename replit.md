@@ -16,6 +16,20 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 
+## Field Name Pipeline (Critical)
+All Gemini schema field names in `parse.ts` now EXACTLY match the app's data structures.
+A two-layer normalisation runs on every API response:
+1. **`parse.ts` Gemini schema** — instructs Gemini to output the canonical names directly
+2. **`lib/fieldMapper.ts` `normalizeFields()`** — safety-net alias resolver (alias → canonical) + inference rules (derives cogs, netProfit, taxDue, etc. if missing)
+3. **`lib/parseViaApi.ts`** — applies `normalizeFields` after every API call, so all 4 screens receive pre-normalised data
+
+Canonical field name → app key mappings:
+- Balance Sheet: `currentAssets`, `currentLiabilities`, `inventory`, `debtors`, `creditors`, `cash`
+- P&L: `sales`, `cogs`, `purchases`, `expenses`, `netProfit`, `grossProfit`, `EBITDA`
+- Banking: `totalCredits`, `totalDebits`, `averageBalance`, `chequeReturns`, `openingBalance`, `closingBalance`
+- GSTR: `gstin`, `totalTaxableTurnover`, `igstCollected`, `cgstCollected`, `sgstCollected`, `totalItcAvailable`, `totalItcUtilized`, `interestPaid`
+- ITR: `taxableIncome`, `totalDeductions`, `netTaxLiability`, `taxDue`, `tdsDeducted`, `advanceTaxPaid`
+
 ## Dhanush Enterprises — Financial Intelligence Platform
 
 ### Web App (`artifacts/financial-analyzer`)

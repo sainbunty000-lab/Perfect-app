@@ -119,18 +119,21 @@ export default function MultiYearScreen() {
     try {
       const parsed = await parseFinancialDocument(raw.uri, raw.name, raw.mimeType ?? undefined, "balance_sheet");
       const f = parsed.fields as any;
+      // normalizeFields already applied — keys match YearData / WorkingCapitalData
       setSlot(i, {
         bsParsing: false, bsFile: raw.name, bsFormat: FORMAT_LABEL[parsed.format],
         data: {
           ...slots[i].data,
-          ...(f.currentAssets      !== undefined && { currentAssets:      f.currentAssets }),
-          ...(f.currentLiabilities !== undefined && { currentLiabilities: f.currentLiabilities }),
-          ...(f.inventory          !== undefined && { inventory:          f.inventory }),
-          ...(f.debtors            !== undefined && { debtors:            f.debtors }),
-          ...(f.creditors          !== undefined && { creditors:          f.creditors }),
-          ...(f.cash               !== undefined && { cash:               f.cash }),
-          ...(f.totalAssets        !== undefined && { totalAssets:        f.totalAssets }),
-          ...(f.netWorth           !== undefined && { netWorth:           f.netWorth }),
+          ...(f.currentAssets      != null && { currentAssets:      f.currentAssets }),
+          ...(f.currentLiabilities != null && { currentLiabilities: f.currentLiabilities }),
+          ...(f.inventory          != null && { inventory:          f.inventory }),
+          ...(f.debtors            != null && { debtors:            f.debtors }),
+          ...(f.creditors          != null && { creditors:          f.creditors }),
+          ...(f.cash               != null && { cash:               f.cash }),
+          ...(f.totalAssets        != null && { totalAssets:        f.totalAssets }),
+          ...(f.netWorth           != null && { netWorth:           f.netWorth }),
+          ...(f.bankOD             != null && { bankOD:             f.bankOD }),
+          ...(f.longTermLoans      != null && { longTermLoans:      f.longTermLoans }),
         },
       });
       setAnalyzed(false);
@@ -148,15 +151,22 @@ export default function MultiYearScreen() {
     try {
       const parsed = await parseFinancialDocument(raw.uri, raw.name, raw.mimeType ?? undefined, "profit_loss");
       const f = parsed.fields as any;
+      // normalizeFields already applied — keys match YearData
       setSlot(i, {
         plParsing: false, plFile: raw.name, plFormat: FORMAT_LABEL[parsed.format],
         data: {
           ...slots[i].data,
-          ...(f.sales       !== undefined && { sales:       f.sales }),
-          ...(f.grossProfit !== undefined && { grossProfit: f.grossProfit }),
-          ...(f.netProfit   !== undefined && { netProfit:   f.netProfit }),
-          ...(f.expenses    !== undefined && { expenses:    f.expenses }),
-          ...(f.ebitda      !== undefined && { ebitda:      f.ebitda }),
+          ...(f.sales             != null && { sales:             f.sales }),
+          ...(f.cogs              != null && { cogs:              f.cogs }),
+          ...(f.purchases         != null && { purchases:         f.purchases }),
+          ...(f.grossProfit       != null && { grossProfit:       f.grossProfit }),
+          ...(f.netProfit         != null && { netProfit:         f.netProfit }),
+          ...(f.expenses          != null && { expenses:          f.expenses }),
+          ...(f.EBITDA            != null && { ebitda:            f.EBITDA }),
+          ...(f.depreciation      != null && { depreciation:      f.depreciation }),
+          ...(f.interestExpenses  != null && { interestExpenses:  f.interestExpenses }),
+          ...(f.tax               != null && { tax:               f.tax }),
+          ...(f.otherIncome       != null && { otherIncome:       f.otherIncome }),
         },
       });
       setAnalyzed(false);
