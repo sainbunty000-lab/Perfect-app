@@ -126,9 +126,7 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
       const line = lines[i];
       const lower = line.toLowerCase();
 
-      if (excludeKeywords.some((ex) => lower.includes(ex.toLowerCase()))) continue;
-
-      // Find which keyword matched AND its position in the line
+      // Find which keyword matched AND its position in the line FIRST
       let matchPos = -1;
       let matchLen = 0;
       for (const kw of keywords) {
@@ -140,6 +138,31 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
         }
       }
       if (matchPos === -1) continue;
+
+      // ── Position-aware exclusion ──────────────────────────────────────────
+      // Two-column Indian balance sheets put BOTH a liability label and an asset
+      // label on the SAME text line, e.g.:
+      //   "PROVISION FOR TAXATION 3,50,000   SUNDRY CREDITORS 1,43,827"
+      // Old full-line check would skip the ENTIRE line because "provision" appears
+      // anywhere, losing the creditors value on the right side.
+      //
+      // New rules:
+      //   (a) Exclude keyword appears AFTER our keyword → always skip (same semantic unit)
+      //   (b) Exclude keyword ends within 20 chars BEFORE our keyword → skip (same clause)
+      //   (c) Exclude keyword ends >20 chars before our keyword → ignore (different column)
+      if (excludeKeywords.length > 0) {
+        const exBefore = lower.slice(0, matchPos);
+        const exAfter  = lower.slice(matchPos + matchLen);
+        const shouldExclude = excludeKeywords.some((ex) => {
+          const exL = ex.toLowerCase();
+          if (exAfter.includes(exL)) return true;           // (a) after keyword
+          const beforeIdx = exBefore.lastIndexOf(exL);
+          if (beforeIdx === -1) return false;
+          const gap = matchPos - (beforeIdx + exL.length);
+          return gap <= 20;                                  // (b) same clause
+        });
+        if (shouldExclude) continue;
+      }
 
       // ── Position-aware: extract numbers from the text AFTER the keyword ──
       const afterKeyword = line.slice(matchPos + matchLen);
@@ -195,6 +218,9 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
     "closing stock", "closing inventory", "stock-in-trade",
     "stock in trade", "inventories", "finished goods",
     "raw material stock", "wip stock",
+    "stock-in-process", "stock in process",
+    "work-in-progress", "work in progress", "work in process",
+    "stores and spares", "stores & spares",
   ]);
 
   // Advances / Other CA — exclude liability-side loan terms
@@ -218,12 +244,13 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
 
   // --- Liabilities components ---
 
-  // Creditors — exclude debtors keywords to avoid two-column cross-matches
+  // Creditors — position-aware exclusion handles two-column cross-matches
+  // "provision" intentionally removed: "SUNDRY CREDITORS (NET OF PROVISION)" must not be skipped
   const compCreditors = findValue([
     "sundry creditors", "trade creditors",
     "trade payables", "accounts payable",
     "creditors",
-  ], false, ["provision", "other payables", "debtors", "receivable"]);
+  ], false, ["debtors", "receivable"]);
 
   // Provisions / Other Current Liabilities
   // "OTHER PROVISION B/S" in Kalu Ram BS is the TOTAL; avoid double-counting sub-items
@@ -232,7 +259,7 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
     "other current liabilities",
     "provisions",
     "accrued liabilities",
-  ], false, ["for taxation", "for doubtful"]);
+  ], false, ["for taxation", "taxation", "for doubtful", "income tax"]);
 
   const compOD = findValue(["bank overdraft", "od payable", "cash credit"]);
 

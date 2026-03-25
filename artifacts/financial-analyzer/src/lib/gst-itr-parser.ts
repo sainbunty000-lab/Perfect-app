@@ -120,7 +120,15 @@ function extractNums(text: string): number[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Core line-by-line value finder
+// Core line-by-line value finder — position-aware
+//
+// For GSTR-3B table rows like:
+//   "Outward taxable supplies  1,23,456  18,519  0  0"
+// Old approach (last number) → 0 (SGST column)  ← WRONG
+// New approach (first number AFTER keyword) → 1,23,456 ← CORRECT
+//
+// Exclusion is also position-aware: only checks text from the matched keyword
+// position onward (same 20-char before-window rule as parser.ts findValue).
 // ─────────────────────────────────────────────────────────────────────────────
 function findVal(
   lines: string[],
@@ -133,11 +141,34 @@ function findVal(
   for (let i = 0; i < lines.length; i++) {
     const lower = lines[i].toLowerCase();
     if (keywords.every((kw) => !lower.includes(kw.toLowerCase()))) continue;
-    if (excludeKw.some((ex) => lower.includes(ex.toLowerCase()))) continue;
 
-    const nums = extractNums(lines[i]).filter((n) => n >= minVal);
+    // Find keyword position
+    let matchPos = -1, matchLen = 0;
+    for (const kw of keywords) {
+      const pos = lower.indexOf(kw.toLowerCase());
+      if (pos !== -1) { matchPos = pos; matchLen = kw.length; break; }
+    }
+    if (matchPos === -1) continue;
+
+    // Position-aware exclusion (same logic as parser.ts findValue)
+    if (excludeKw.length > 0) {
+      const exBefore = lower.slice(0, matchPos);
+      const exAfter  = lower.slice(matchPos + matchLen);
+      const skip = excludeKw.some((ex) => {
+        const exL = ex.toLowerCase();
+        if (exAfter.includes(exL)) return true;
+        const beforeIdx = exBefore.lastIndexOf(exL);
+        if (beforeIdx === -1) return false;
+        return matchPos - (beforeIdx + exL.length) <= 20;
+      });
+      if (skip) continue;
+    }
+
+    // First number AFTER keyword position (not last on line)
+    const afterText = lines[i].slice(matchPos + matchLen);
+    const nums = extractNums(afterText).filter((n) => n >= minVal);
     if (nums.length > 0) {
-      candidates.push(nums[nums.length - 1]);
+      candidates.push(nums[0]);
     } else {
       // Check next 1–2 lines
       for (const d of [1, 2]) {
