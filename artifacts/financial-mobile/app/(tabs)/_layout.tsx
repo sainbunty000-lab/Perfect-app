@@ -5,7 +5,6 @@ import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
-
 import Colors from "@/constants/colors";
 
 const C = Colors.light;
@@ -21,6 +20,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "building.columns", selected: "building.columns.fill" }} />
         <Label>Banking</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="gst-itr">
+        <Icon sf={{ default: "doc.text", selected: "doc.text.fill" }} />
+        <Label>GST & ITR</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="saved">
         <Icon sf={{ default: "folder", selected: "folder.fill" }} />
         <Label>Saved Cases</Label>
@@ -31,7 +34,6 @@ function NativeTabLayout() {
 
 function ClassicTabLayout() {
   const isIOS = Platform.OS === "ios";
-  const isWeb = Platform.OS === "web";
 
   return (
     <Tabs
@@ -45,12 +47,8 @@ function ClassicTabLayout() {
           borderTopWidth: 1,
           borderTopColor: C.border,
           elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
         },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontFamily: "Inter_500Medium",
-        },
+        tabBarLabelStyle: { fontSize: 10, fontFamily: "Inter_500Medium" },
         tabBarBackground: () =>
           isIOS ? (
             <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
@@ -62,13 +60,8 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Working Capital",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <Feather name="bar-chart-2" size={22} color={color} />
-            ) : (
-              <Feather name="bar-chart-2" size={22} color={color} />
-            ),
+          title: "WC Analysis",
+          tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={21} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -76,17 +69,24 @@ function ClassicTabLayout() {
         options={{
           title: "Banking",
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="bank-outline" size={22} color={color} />
+            <MaterialCommunityIcons name="bank-outline" size={21} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="gst-itr"
+        options={{
+          title: "GST & ITR",
+          tabBarIcon: ({ color }) => <Feather name="file-text" size={21} color={color} />,
+          tabBarActiveTintColor: "#A855F7",
         }}
       />
       <Tabs.Screen
         name="saved"
         options={{
           title: "Saved Cases",
-          tabBarIcon: ({ color }) => (
-            <Feather name="folder" size={22} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Feather name="folder" size={21} color={color} />,
+          tabBarActiveTintColor: "#F5832A",
         }}
       />
     </Tabs>
@@ -94,8 +94,6 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
+  if (isLiquidGlassAvailable()) return <NativeTabLayout />;
   return <ClassicTabLayout />;
 }

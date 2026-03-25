@@ -58,6 +58,8 @@
   "dependencies": {
     "@types/papaparse": "^5.5.2",
     "expo-document-picker": "^14.0.8",
+    "expo-print": "^55.0.9",
+    "expo-sharing": "^55.0.14",
     "papaparse": "^5.5.3"
   }
 }
