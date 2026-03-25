@@ -15,6 +15,7 @@ import type { WorkingCapitalData, WorkingCapitalResults } from "@/lib/calculatio
 import { parseFileViaApi, FORMAT_LABEL } from "@/lib/parseViaApi";
 import { exportWorkingCapitalPDF } from "@/lib/pdfExport";
 import { useCreateCase } from "@workspace/api-client-react";
+import { PageBackground, PageHeader } from "@/components/UI";
 
 const C = Colors.light;
 
@@ -301,21 +302,21 @@ export default function WorkingCapitalScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: C.background }}
+      style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      <PageBackground>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16, paddingBottom: tabBarHeight + 24 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.brand}>DHANUSH ENTERPRISES</Text>
-          <Text style={styles.title}>Working Capital</Text>
-          <Text style={styles.subtitle}>Balance Sheet & Profit & Loss Analysis</Text>
-        </View>
+        <PageHeader
+          title="Working Capital"
+          subtitle="Balance Sheet & Profit & Loss Analysis"
+          accentColor={C.secondary}
+        />
 
         {/* ── Upload: Balance Sheet ─────────────────────────────────────── */}
         <View style={styles.uploadSection}>
@@ -471,6 +472,7 @@ export default function WorkingCapitalScreen() {
           </View>
         </View>
       </Modal>
+      </PageBackground>
     </KeyboardAvoidingView>
   );
 }

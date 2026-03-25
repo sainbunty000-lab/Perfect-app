@@ -6,16 +6,19 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { parseFileViaApi, FORMAT_LABEL } from "@/lib/parseViaApi";
 import { exportGstItrPDF } from "@/lib/pdfExport";
+import {
+  PageBackground, PageHeader, GlassCard, UploadZone,
+  GradientButton, CardTitle,
+} from "@/components/UI";
 
 const C = Colors.light;
 const PURPLE = "#A855F7";
-
-// ─── Lightweight GST/ITR parsers (mobile version) ─────────────────────────────
 
 function getNum(lines: string[], keywords: string[]): number | undefined {
   for (const line of lines) {
@@ -32,133 +35,89 @@ function getNum(lines: string[], keywords: string[]): number | undefined {
 }
 
 interface GstrFields {
-  gstin?: string;
-  filingPeriod?: string;
-  totalTaxableTurnover?: number;
-  totalOutputTax?: number;
-  igstCollected?: number;
-  cgstCollected?: number;
-  sgstCollected?: number;
-  totalItcAvailable?: number;
-  totalItcUtilized?: number;
-  netTaxPayable?: number;
-  taxPaidCash?: number;
-  lateFee?: number;
-  interestPaid?: number;
+  gstin?: string; filingPeriod?: string; totalTaxableTurnover?: number;
+  totalOutputTax?: number; igstCollected?: number; cgstCollected?: number;
+  sgstCollected?: number; totalItcAvailable?: number; totalItcUtilized?: number;
+  netTaxPayable?: number; taxPaidCash?: number; lateFee?: number; interestPaid?: number;
 }
-
 interface ItrFields {
-  assessmentYear?: string;
-  panNumber?: string;
-  itrForm?: string;
-  grossTotalIncome?: number;
-  taxableIncome?: number;
-  businessIncome?: number;
-  totalDeductions?: number;
-  taxPayable?: number;
-  netTaxLiability?: number;
-  tdsDeducted?: number;
-  advanceTaxPaid?: number;
-  refundAmount?: number;
-  taxDue?: number;
+  assessmentYear?: string; panNumber?: string; itrForm?: string;
+  grossTotalIncome?: number; taxableIncome?: number; businessIncome?: number;
+  totalDeductions?: number; taxPayable?: number; netTaxLiability?: number;
+  tdsDeducted?: number; advanceTaxPaid?: number; refundAmount?: number; taxDue?: number;
 }
-
 interface AnalysisResult {
-  docType: string;
-  gstr?: GstrFields;
-  itr?: ItrFields;
-  complianceScore: number;
-  complianceGrade: string;
-  itcUtilizationRatio?: number;
-  effectiveGstRate?: number;
-  effectiveTaxRate?: number;
-  tdsCoverageRatio?: number;
-  turnoverMatchScore?: number;
-  flags: string[];
-  strengths: string[];
+  docType: string; gstr?: GstrFields; itr?: ItrFields;
+  complianceScore: number; complianceGrade: string;
+  itcUtilizationRatio?: number; effectiveGstRate?: number;
+  effectiveTaxRate?: number; tdsCoverageRatio?: number; turnoverMatchScore?: number;
+  flags: string[]; strengths: string[];
 }
 
 function parseGstr(text: string): GstrFields {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const g = getNum.bind(null, lines);
+  const g = (kw: string[]) => getNum(lines, kw);
   const gstinMatch = text.match(/\b\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}\b/);
-  const periodMatch = text.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* ?[-–]? ?20\d{2}\b/i) || text.match(/20\d{2}[-–]20?\d{2}/);
+  const periodMatch = text.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* ?[-–]? ?20\d{2}\b/i)
+    || text.match(/20\d{2}[-–]20?\d{2}/);
   return {
-    gstin: gstinMatch?.[0],
-    filingPeriod: periodMatch?.[0],
+    gstin: gstinMatch?.[0], filingPeriod: periodMatch?.[0],
     totalTaxableTurnover: g(["total taxable value", "outward taxable", "taxable turnover", "total turnover"]),
-    igstCollected: g(["igst", "integrated tax"]),
-    cgstCollected: g(["cgst", "central tax"]),
+    igstCollected: g(["igst", "integrated tax"]), cgstCollected: g(["cgst", "central tax"]),
     sgstCollected: g(["sgst", "state tax", "utgst"]),
     totalOutputTax: g(["total tax liability", "total output tax"]),
     totalItcAvailable: g(["total itc available", "eligible itc"]),
     totalItcUtilized: g(["itc utilized", "total itc utilized"]),
     netTaxPayable: g(["net tax payable", "tax payable"]),
     taxPaidCash: g(["cash ledger", "paid in cash"]),
-    lateFee: g(["late fee", "late fees"]),
-    interestPaid: g(["interest paid", "interest on delayed"]),
+    lateFee: g(["late fee", "late fees"]), interestPaid: g(["interest paid", "interest on delayed"]),
   };
 }
-
 function parseItr(text: string): ItrFields {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const g = getNum.bind(null, lines);
+  const g = (kw: string[]) => getNum(lines, kw);
   const ayMatch = text.match(/a\.?y\.? ?20\d{2}[-–]20?\d{2}/i);
   const panMatch = text.match(/\b[A-Z]{5}[0-9]{4}[A-Z]\b/);
   const itrFormMatch = text.match(/\bitr[-‐– ]?[1-7u]\b/i);
   return {
-    assessmentYear: ayMatch?.[0],
-    panNumber: panMatch?.[0],
+    assessmentYear: ayMatch?.[0], panNumber: panMatch?.[0],
     itrForm: itrFormMatch?.[0]?.toUpperCase().replace(/[-‐– ]/, "-"),
     grossTotalIncome: g(["gross total income", "total of income"]),
-    businessIncome: g(["profit and gains from business", "business income", "income from business", "presumptive income"]),
+    businessIncome: g(["profit and gains from business", "business income", "presumptive income"]),
     totalDeductions: g(["total deductions", "deductions u/s 80", "total vi-a"]),
     taxableIncome: g(["total taxable income", "taxable income", "net income"]),
     taxPayable: g(["income tax payable", "tax on total income"]),
     netTaxLiability: g(["net tax liability", "total tax liability"]),
     tdsDeducted: g(["total tds", "tds deducted", "tax deducted at source"]),
     advanceTaxPaid: g(["advance tax"]),
-    refundAmount: g(["refund due", "refund amount"]),
-    taxDue: g(["tax due", "balance tax"]),
+    refundAmount: g(["refund due", "refund amount"]), taxDue: g(["tax due", "balance tax"]),
   };
 }
-
 function analyze(gstr?: GstrFields, itr?: ItrFields): AnalysisResult {
-  const flags: string[] = [];
-  const strengths: string[] = [];
+  const flags: string[] = [], strengths: string[] = [];
   let score = 60;
-
-  let itcUtilizationRatio: number | undefined;
-  let effectiveGstRate: number | undefined;
-  let effectiveTaxRate: number | undefined;
-  let tdsCoverageRatio: number | undefined;
+  let itcUtilizationRatio: number | undefined, effectiveGstRate: number | undefined;
+  let effectiveTaxRate: number | undefined, tdsCoverageRatio: number | undefined;
   let turnoverMatchScore: number | undefined;
-
   if (gstr) {
     const itcAvail = gstr.totalItcAvailable ?? 0;
     const itcUsed = gstr.totalItcUtilized ?? itcAvail;
     const turnover = gstr.totalTaxableTurnover ?? 0;
-    const outputTax = gstr.totalOutputTax ?? (( gstr.igstCollected ?? 0) + (gstr.cgstCollected ?? 0) + (gstr.sgstCollected ?? 0));
-    const netGst = gstr.netTaxPayable ?? 0;
-
+    const outputTax = gstr.totalOutputTax ?? ((gstr.igstCollected ?? 0) + (gstr.cgstCollected ?? 0) + (gstr.sgstCollected ?? 0));
     if (itcAvail > 0) {
       itcUtilizationRatio = Math.min(100, (itcUsed / itcAvail) * 100);
       if (itcUtilizationRatio >= 90) { strengths.push("High ITC utilization."); score += 8; }
       else if (itcUtilizationRatio < 50) { flags.push("Low ITC utilization — credit may be lost."); score -= 5; }
     }
-    if (turnover > 0 && outputTax > 0) {
-      effectiveGstRate = (outputTax / turnover) * 100;
-    }
+    if (turnover > 0 && outputTax > 0) effectiveGstRate = (outputTax / turnover) * 100;
     if ((gstr.lateFee ?? 0) > 0) { flags.push("Late fee paid — indicates delayed filing."); score -= 8; }
     else strengths.push("No late fees detected.");
     if ((gstr.interestPaid ?? 0) > 0) { flags.push("Interest on delayed payment."); score -= 5; }
   }
-
   if (itr) {
     const taxable = itr.taxableIncome ?? itr.grossTotalIncome ?? 0;
     const taxPay = itr.netTaxLiability ?? itr.taxPayable ?? 0;
     const tds = itr.tdsDeducted ?? 0;
-
     if (taxable > 0 && taxPay > 0) {
       effectiveTaxRate = (taxPay / taxable) * 100;
       if (effectiveTaxRate > 30) { flags.push("High effective tax rate — review deductions."); score -= 5; }
@@ -170,7 +129,6 @@ function analyze(gstr?: GstrFields, itr?: ItrFields): AnalysisResult {
       else if (tdsCoverageRatio < 30) { flags.push("Low TDS coverage — high cash tax needed."); score -= 3; }
     }
     if ((itr.refundAmount ?? 0) > 0) strengths.push("Tax refund due.");
-
     if (gstr && gstr.totalTaxableTurnover && (itr.grossTotalIncome ?? 0) > 0) {
       const itrIncome = itr.businessIncome ?? itr.grossTotalIncome ?? 0;
       const variance = Math.abs(gstr.totalTaxableTurnover - itrIncome) / Math.max(gstr.totalTaxableTurnover, itrIncome);
@@ -179,25 +137,38 @@ function analyze(gstr?: GstrFields, itr?: ItrFields): AnalysisResult {
       else if (turnoverMatchScore < 50) { flags.push("GST turnover vs ITR income mismatch — reconcile."); score -= 10; }
     }
   }
-
   score = Math.max(10, Math.min(100, score));
   const grade = score >= 80 ? "A" : score >= 65 ? "B" : score >= 50 ? "C" : "D";
   if (!flags.length) strengths.push("No major compliance issues detected.");
-
-  const docType = gstr && itr ? "GSTR + ITR" : itr ? "ITR" : "GSTR";
-  return { docType, gstr, itr, complianceScore: score, complianceGrade: grade,
+  return {
+    docType: gstr && itr ? "GSTR + ITR" : itr ? "ITR" : "GSTR",
+    gstr, itr, complianceScore: score, complianceGrade: grade,
     itcUtilizationRatio: itcUtilizationRatio !== undefined ? +itcUtilizationRatio.toFixed(1) : undefined,
     effectiveGstRate: effectiveGstRate !== undefined ? +effectiveGstRate.toFixed(2) : undefined,
     effectiveTaxRate: effectiveTaxRate !== undefined ? +effectiveTaxRate.toFixed(1) : undefined,
     tdsCoverageRatio: tdsCoverageRatio !== undefined ? +tdsCoverageRatio.toFixed(1) : undefined,
-    turnoverMatchScore, flags, strengths };
+    turnoverMatchScore, flags, strengths,
+  };
+}
+function buildSummaryText(r: AnalysisResult): string {
+  const lines = [`GST & ITR COMPLIANCE ANALYSIS`, `Document Type: ${r.docType}`,
+    `Compliance Score: ${r.complianceScore}/100  (Grade ${r.complianceGrade})`, "", "=== KEY METRICS ==="];
+  if (r.itcUtilizationRatio !== undefined) lines.push(`ITC Utilization: ${r.itcUtilizationRatio.toFixed(1)}%`);
+  if (r.effectiveGstRate !== undefined) lines.push(`Effective GST Rate: ${r.effectiveGstRate.toFixed(2)}%`);
+  if (r.effectiveTaxRate !== undefined) lines.push(`Effective Income Tax Rate: ${r.effectiveTaxRate.toFixed(1)}%`);
+  if (r.tdsCoverageRatio !== undefined) lines.push(`TDS Coverage: ${r.tdsCoverageRatio.toFixed(1)}%`);
+  if (r.turnoverMatchScore !== undefined) lines.push(`GST–ITR Turnover Match: ${r.turnoverMatchScore}%`);
+  if (r.flags.length) { lines.push("", "=== RED FLAGS ==="); r.flags.forEach((f) => lines.push(`• ${f}`)); }
+  if (r.strengths.length) { lines.push("", "=== STRENGTHS ==="); r.strengths.forEach((s) => lines.push(`• ${s}`)); }
+  return lines.join("\n");
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+const INR = (n?: number) => n !== undefined ? "₹" + Math.abs(n).toLocaleString("en-IN") : "—";
+const PCT = (n?: number) => n !== undefined ? n.toFixed(1) + "%" : "—";
+
 export default function GstItrScreen() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
-
   const [parsing, setParsing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<{ name: string; format: string }[]>([]);
@@ -206,9 +177,9 @@ export default function GstItrScreen() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
 
   const detectType = (text: string): "GSTR" | "ITR" | "BOTH" | "UNKNOWN" => {
-    const lower = text.toLowerCase();
-    const hasGst = lower.includes("gstin") || lower.includes("gstr") || lower.includes("outward supplies") || lower.includes("input tax credit");
-    const hasItr = lower.includes("assessment year") || lower.includes("itr-") || lower.includes("gross total income") || lower.includes("tds deducted");
+    const l = text.toLowerCase();
+    const hasGst = l.includes("gstin") || l.includes("gstr") || l.includes("outward supplies") || l.includes("input tax credit");
+    const hasItr = l.includes("assessment year") || l.includes("itr-") || l.includes("gross total income") || l.includes("tds deducted");
     if (hasGst && hasItr) return "BOTH";
     if (hasGst) return "GSTR";
     if (hasItr) return "ITR";
@@ -220,10 +191,7 @@ export default function GstItrScreen() {
       const result = await DocumentPicker.getDocumentAsync({ type: ["*/*"], copyToCacheDirectory: true, multiple: true });
       if (result.canceled) return;
       setParsing(true);
-
-      let newGstr = gstrData;
-      let newItr = itrData;
-
+      let newGstr = gstrData, newItr = itrData;
       for (const asset of result.assets) {
         const parsed = await parseFileViaApi(asset.uri, asset.name, asset.mimeType ?? undefined);
         const type = detectType(parsed.text);
@@ -231,17 +199,12 @@ export default function GstItrScreen() {
         if (type === "ITR"  || type === "BOTH") newItr  = { ...newItr,  ...parseItr(parsed.text) };
         setUploadedFiles((f) => [...f, { name: asset.name, format: FORMAT_LABEL[parsed.format] }]);
       }
-
-      setGstrData(newGstr);
-      setItrData(newItr);
-      setResult(null);
+      setGstrData(newGstr); setItrData(newItr); setResult(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       Alert.alert("Parse Failed", "Could not read the file.");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
-      setParsing(false);
-    }
+    } finally { setParsing(false); }
   };
 
   const handleAnalyze = () => {
@@ -253,167 +216,191 @@ export default function GstItrScreen() {
   const handleExport = async () => {
     if (!result) return;
     setExporting(true);
-    try {
-      const summary = buildSummaryText(result);
-      await exportGstItrPDF("GST & ITR Analysis", summary);
-    } catch {
-      Alert.alert("Export Failed");
-    } finally {
-      setExporting(false);
-    }
+    try { await exportGstItrPDF("GST & ITR Analysis", buildSummaryText(result)); }
+    catch { Alert.alert("Export Failed"); }
+    finally { setExporting(false); }
   };
 
   const gradeColor = (g: string) =>
     g === "A" ? C.success : g === "B" ? C.secondary : g === "C" ? C.warning : C.danger;
 
-  const INR = (n?: number) => n !== undefined ? "₹" + Math.abs(n).toLocaleString("en-IN") : "—";
-  const PCT = (n?: number) => n !== undefined ? n.toFixed(1) + "%" : "—";
-
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: C.background }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16, paddingBottom: tabBarHeight + 24 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.brand, { color: PURPLE }]}>DHANUSH ENTERPRISES</Text>
-          <Text style={styles.title}>GST & ITR Analysis</Text>
-          <Text style={styles.subtitle}>Upload GSTR-1, GSTR-3B or ITR forms for compliance analysis</Text>
-        </View>
-
-        {/* Upload */}
-        <TouchableOpacity style={[styles.uploadBtn, { borderColor: PURPLE + "40" }]} onPress={handlePickFile} activeOpacity={0.8}>
-          {parsing ? <ActivityIndicator color={PURPLE} size="small" /> : <Feather name="file-text" size={18} color={PURPLE} />}
-          <Text style={styles.uploadText}>
-            {uploadedFiles.length > 0 ? `${uploadedFiles.length} file(s) loaded` : "Upload PDF / Excel / Image / TXT"}
-          </Text>
-          {uploadedFiles.length > 0 && <Feather name="check-circle" size={16} color={C.success} />}
-        </TouchableOpacity>
-
-        {uploadedFiles.map((f, i) => (
-          <View key={i} style={styles.fileChip}>
-            <Feather name="file" size={13} color={C.textSecondary} />
-            <Text style={styles.fileChipText} numberOfLines={1}>{f.name}</Text>
-            <Text style={styles.fileChipFormat}>{f.format}</Text>
-          </View>
-        ))}
-
-        {/* Supported types */}
-        <View style={[styles.card, { borderColor: PURPLE + "30" }]}>
-          <Text style={[styles.cardTitle, { color: PURPLE }]}>Supported Documents</Text>
-          {["GSTR-3B — Monthly tax summary", "GSTR-1 — Outward supplies", "GSTR-9 — Annual GST return",
-            "ITR-1 / ITR-2 — Individual", "ITR-3 / ITR-4 — Business income", "Computation Sheet"].map((d) => (
-            <View key={d} style={styles.docRow}>
-              <View style={[styles.dot, { backgroundColor: PURPLE }]} />
-              <Text style={styles.docText}>{d}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Analyze Button */}
-        <TouchableOpacity
-          style={[styles.calcBtn, { backgroundColor: PURPLE, opacity: uploadedFiles.length === 0 ? 0.5 : 1 }]}
-          onPress={handleAnalyze} activeOpacity={0.85}
-          disabled={uploadedFiles.length === 0}
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <PageBackground>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16, paddingBottom: tabBarHeight + 24 }]}
+          showsVerticalScrollIndicator={false}
         >
-          <Feather name="zap" size={18} color="#fff" />
-          <Text style={styles.calcBtnText}>Analyze Documents</Text>
-        </TouchableOpacity>
+          <PageHeader
+            title="GST & ITR Analysis"
+            subtitle="Upload GSTR-1, GSTR-3B or ITR for compliance analysis"
+            accentColor={PURPLE}
+          />
 
-        {/* Results */}
-        {result && (
-          <>
-            {/* Score */}
-            <View style={[styles.scoreCard, { borderColor: PURPLE + "40" }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.assessLabel}>Compliance Score</Text>
-                <Text style={[styles.scoreNum, { color: PURPLE }]}>{result.complianceScore}<Text style={styles.scoreMax}>/100</Text></Text>
-                <Text style={styles.docTypeText}>Type: {result.docType}</Text>
+          {/* Upload */}
+          <UploadZone
+            onPress={handlePickFile}
+            loading={parsing}
+            uploaded={uploadedFiles.length > 0}
+            fileName={uploadedFiles.length === 1 ? uploadedFiles[0].name : `${uploadedFiles.length} files loaded`}
+            label="Upload GST / ITR Documents (PDF / Excel / Image)"
+            accentColor={PURPLE}
+            onClear={() => { setUploadedFiles([]); setGstrData(undefined); setItrData(undefined); setResult(null); }}
+          />
+
+          {/* Supported docs */}
+          <GlassCard accentColor={PURPLE}>
+            <CardTitle>Supported Documents</CardTitle>
+            {[
+              ["GSTR-3B", "Monthly tax summary"],
+              ["GSTR-1", "Outward supplies statement"],
+              ["GSTR-9", "Annual GST return"],
+              ["ITR-1 / ITR-2", "Individual income tax return"],
+              ["ITR-3 / ITR-4", "Business income return"],
+              ["Computation Sheet", "Tax computation"],
+            ].map(([doc, desc]) => (
+              <View key={doc} style={styles.docRow}>
+                <View style={[styles.dot, { backgroundColor: PURPLE }]} />
+                <Text style={styles.docName}>{doc}</Text>
+                <Text style={styles.docDesc}> — {desc}</Text>
               </View>
-              <Text style={[styles.gradeText, { color: gradeColor(result.complianceGrade) }]}>{result.complianceGrade}</Text>
-            </View>
+            ))}
+          </GlassCard>
 
-            {/* Metrics */}
-            <View style={styles.metricsGrid}>
-              {result.itcUtilizationRatio !== undefined && (
-                <MetricTile label="ITC Utilization" value={PCT(result.itcUtilizationRatio)} good={result.itcUtilizationRatio >= 80} />
-              )}
-              {result.effectiveGstRate !== undefined && (
-                <MetricTile label="Effective GST Rate" value={PCT(result.effectiveGstRate)} neutral />
-              )}
-              {result.effectiveTaxRate !== undefined && (
-                <MetricTile label="Eff. Tax Rate (ITR)" value={PCT(result.effectiveTaxRate)} good={result.effectiveTaxRate < 20} />
-              )}
-              {result.tdsCoverageRatio !== undefined && (
-                <MetricTile label="TDS Coverage" value={PCT(result.tdsCoverageRatio)} good={result.tdsCoverageRatio >= 80} />
-              )}
-              {result.turnoverMatchScore !== undefined && (
-                <MetricTile label="GST–ITR Match" value={result.turnoverMatchScore + "%"} good={result.turnoverMatchScore >= 80} />
-              )}
-            </View>
+          {/* Analyze button */}
+          <GradientButton
+            onPress={handleAnalyze}
+            label="Analyze Documents"
+            icon="zap"
+            colors={[PURPLE, "#7C3AED"]}
+          />
 
-            {/* GSTR Data */}
-            {result.gstr && (
-              <DataCard title="GST Return Data" color={PURPLE} rows={[
-                ["GSTIN", result.gstr.gstin ?? "—"],
-                ["Period", result.gstr.filingPeriod ?? "—"],
-                ["Taxable Turnover", INR(result.gstr.totalTaxableTurnover)],
-                ["IGST Collected", INR(result.gstr.igstCollected)],
-                ["CGST Collected", INR(result.gstr.cgstCollected)],
-                ["SGST Collected", INR(result.gstr.sgstCollected)],
-                ["Total Output Tax", INR(result.gstr.totalOutputTax)],
-                ["ITC Available", INR(result.gstr.totalItcAvailable)],
-                ["ITC Utilized", INR(result.gstr.totalItcUtilized)],
-                ["Net Tax Payable", INR(result.gstr.netTaxPayable)],
-                ["Tax Paid (Cash)", INR(result.gstr.taxPaidCash)],
-                ["Late Fee", INR(result.gstr.lateFee)],
-                ["Interest", INR(result.gstr.interestPaid)],
-              ]} />
-            )}
+          {/* Results */}
+          {result && (
+            <>
+              {/* Score card */}
+              <LinearGradient
+                colors={[gradeColor(result.complianceGrade) + "25", "#152236"]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={styles.scoreCard}
+              >
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Text style={styles.scoreSubtitle}>Compliance Score</Text>
+                  <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
+                    <Text style={[styles.scoreNum, { color: gradeColor(result.complianceGrade) }]}>
+                      {result.complianceScore}
+                    </Text>
+                    <Text style={styles.scoreMax}>/100</Text>
+                  </View>
+                  <Text style={styles.docType}>Type: {result.docType}</Text>
+                </View>
+                <View style={[styles.gradeBadge, { backgroundColor: gradeColor(result.complianceGrade) + "22", borderColor: gradeColor(result.complianceGrade) + "55" }]}>
+                  <Text style={[styles.gradeText, { color: gradeColor(result.complianceGrade) }]}>
+                    {result.complianceGrade}
+                  </Text>
+                </View>
+              </LinearGradient>
 
-            {/* ITR Data */}
-            {result.itr && (
-              <DataCard title="ITR Data" color={C.secondary} rows={[
-                ["PAN", result.itr.panNumber ?? "—"],
-                ["Assessment Year", result.itr.assessmentYear ?? "—"],
-                ["ITR Form", result.itr.itrForm ?? "—"],
-                ["Gross Total Income", INR(result.itr.grossTotalIncome)],
-                ["Business Income", INR(result.itr.businessIncome)],
-                ["Deductions (VI-A)", INR(result.itr.totalDeductions)],
-                ["Taxable Income", INR(result.itr.taxableIncome)],
-                ["Tax Payable", INR(result.itr.taxPayable)],
-                ["TDS Deducted", INR(result.itr.tdsDeducted)],
-                ["Advance Tax Paid", INR(result.itr.advanceTaxPaid)],
-                ["Net Tax Liability", INR(result.itr.netTaxLiability)],
-                ["Refund Amount", INR(result.itr.refundAmount)],
-                ["Tax Due", INR(result.itr.taxDue)],
-              ]} />
-            )}
-
-            {/* Flags & Strengths */}
-            {result.flags.length > 0 && (
-              <View style={[styles.card, { borderColor: C.warning + "30" }]}>
-                <Text style={[styles.cardTitle, { color: C.warning }]}>⚠ Red Flags</Text>
-                {result.flags.map((f, i) => <Text key={i} style={styles.flagText}>• {f}</Text>)}
+              {/* Metrics grid */}
+              <View style={styles.metricsGrid}>
+                {result.itcUtilizationRatio !== undefined && (
+                  <MetricTile label="ITC Utilization" value={PCT(result.itcUtilizationRatio)} good={result.itcUtilizationRatio >= 80} />
+                )}
+                {result.effectiveGstRate !== undefined && (
+                  <MetricTile label="Effective GST" value={PCT(result.effectiveGstRate)} neutral />
+                )}
+                {result.effectiveTaxRate !== undefined && (
+                  <MetricTile label="Tax Rate" value={PCT(result.effectiveTaxRate)} good={result.effectiveTaxRate < 20} />
+                )}
+                {result.tdsCoverageRatio !== undefined && (
+                  <MetricTile label="TDS Coverage" value={PCT(result.tdsCoverageRatio)} good={result.tdsCoverageRatio >= 80} />
+                )}
+                {result.turnoverMatchScore !== undefined && (
+                  <MetricTile label="GST–ITR Match" value={result.turnoverMatchScore + "%"} good={result.turnoverMatchScore >= 80} />
+                )}
               </View>
-            )}
-            {result.strengths.length > 0 && (
-              <View style={[styles.card, { borderColor: C.success + "30" }]}>
-                <Text style={[styles.cardTitle, { color: C.success }]}>✓ Strengths</Text>
-                {result.strengths.map((s, i) => <Text key={i} style={styles.strengthText}>• {s}</Text>)}
-              </View>
-            )}
 
-            {/* Export */}
-            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: C.card, borderColor: C.border }]} onPress={handleExport} disabled={exporting}>
-              {exporting ? <ActivityIndicator size="small" color={PURPLE} /> : <Feather name="download" size={16} color={PURPLE} />}
-              <Text style={[styles.actionBtnText, { color: PURPLE }]}>Export PDF Report</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </ScrollView>
+              {/* GSTR Data */}
+              {result.gstr && (
+                <DataCard title="GST Return Data" accentColor={PURPLE} rows={[
+                  ["GSTIN", result.gstr.gstin ?? "—"],
+                  ["Period", result.gstr.filingPeriod ?? "—"],
+                  ["Taxable Turnover", INR(result.gstr.totalTaxableTurnover)],
+                  ["IGST Collected", INR(result.gstr.igstCollected)],
+                  ["CGST Collected", INR(result.gstr.cgstCollected)],
+                  ["SGST Collected", INR(result.gstr.sgstCollected)],
+                  ["Total Output Tax", INR(result.gstr.totalOutputTax)],
+                  ["ITC Available", INR(result.gstr.totalItcAvailable)],
+                  ["ITC Utilized", INR(result.gstr.totalItcUtilized)],
+                  ["Net Tax Payable", INR(result.gstr.netTaxPayable)],
+                  ["Tax Paid (Cash)", INR(result.gstr.taxPaidCash)],
+                  ["Late Fee", INR(result.gstr.lateFee)],
+                  ["Interest", INR(result.gstr.interestPaid)],
+                ]} />
+              )}
+
+              {/* ITR Data */}
+              {result.itr && (
+                <DataCard title="ITR Data" accentColor={C.secondary} rows={[
+                  ["PAN", result.itr.panNumber ?? "—"],
+                  ["Assessment Year", result.itr.assessmentYear ?? "—"],
+                  ["ITR Form", result.itr.itrForm ?? "—"],
+                  ["Gross Total Income", INR(result.itr.grossTotalIncome)],
+                  ["Business Income", INR(result.itr.businessIncome)],
+                  ["Deductions (VI-A)", INR(result.itr.totalDeductions)],
+                  ["Taxable Income", INR(result.itr.taxableIncome)],
+                  ["Tax Payable", INR(result.itr.taxPayable)],
+                  ["TDS Deducted", INR(result.itr.tdsDeducted)],
+                  ["Advance Tax", INR(result.itr.advanceTaxPaid)],
+                  ["Net Tax Liability", INR(result.itr.netTaxLiability)],
+                  ["Refund Amount", INR(result.itr.refundAmount)],
+                  ["Tax Due", INR(result.itr.taxDue)],
+                ]} />
+              )}
+
+              {/* Flags */}
+              {result.flags.length > 0 && (
+                <GlassCard accentColor={C.warning}>
+                  <CardTitle style={{ color: C.warning }}>Red Flags</CardTitle>
+                  {result.flags.map((f, i) => (
+                    <View key={i} style={styles.flagRow}>
+                      <Feather name="alert-triangle" size={12} color={C.warning} />
+                      <Text style={styles.flagText}>{f}</Text>
+                    </View>
+                  ))}
+                </GlassCard>
+              )}
+
+              {/* Strengths */}
+              {result.strengths.length > 0 && (
+                <GlassCard accentColor={C.success}>
+                  <CardTitle style={{ color: C.success }}>Strengths</CardTitle>
+                  {result.strengths.map((s, i) => (
+                    <View key={i} style={styles.flagRow}>
+                      <Feather name="check-circle" size={12} color={C.success} />
+                      <Text style={[styles.flagText, { color: C.success }]}>{s}</Text>
+                    </View>
+                  ))}
+                </GlassCard>
+              )}
+
+              {/* Export */}
+              <TouchableOpacity
+                style={[styles.exportBtn, { borderColor: PURPLE + "55" }]}
+                onPress={handleExport}
+                disabled={exporting}
+              >
+                <LinearGradient colors={[PURPLE + "18", PURPLE + "08"]} style={StyleSheet.absoluteFill} />
+                {exporting
+                  ? <ActivityIndicator size="small" color={PURPLE} />
+                  : <Feather name="download" size={16} color={PURPLE} />}
+                <Text style={[styles.exportText, { color: PURPLE }]}>Export PDF Report</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </ScrollView>
+      </PageBackground>
     </KeyboardAvoidingView>
   );
 }
@@ -421,91 +408,62 @@ export default function GstItrScreen() {
 function MetricTile({ label, value, good, neutral }: { label: string; value: string; good?: boolean; neutral?: boolean }) {
   const color = neutral ? C.secondary : good ? C.success : C.warning;
   return (
-    <View style={styles.metricTile}>
+    <LinearGradient colors={["#1A2C42", "#152236"]} style={styles.metricTile}>
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={[styles.metricValue, { color }]}>{value}</Text>
-    </View>
+    </LinearGradient>
   );
 }
 
-function DataCard({ title, color, rows }: { title: string; color: string; rows: [string, string][] }) {
+function DataCard({ title, accentColor, rows }: { title: string; accentColor: string; rows: [string, string][] }) {
   const visible = rows.filter(([, v]) => v !== "—");
   if (!visible.length) return null;
   return (
-    <View style={styles.card}>
-      <View style={[styles.cardAccent, { backgroundColor: color }]} />
-      <Text style={[styles.cardTitle, { color }]}>{title}</Text>
+    <GlassCard accentColor={accentColor}>
+      <CardTitle style={{ color: accentColor }}>{title}</CardTitle>
       {visible.map(([l, v]) => (
         <View key={l} style={styles.dataRow}>
           <Text style={styles.dataLabel}>{l}</Text>
           <Text style={styles.dataValue}>{v}</Text>
         </View>
       ))}
-    </View>
+    </GlassCard>
   );
 }
 
-function buildSummaryText(r: AnalysisResult): string {
-  const lines: string[] = [
-    `GST & ITR COMPLIANCE ANALYSIS`,
-    `Document Type: ${r.docType}`,
-    `Compliance Score: ${r.complianceScore}/100  (Grade ${r.complianceGrade})`,
-    "",
-    "=== KEY METRICS ===",
-  ];
-  if (r.itcUtilizationRatio !== undefined) lines.push(`ITC Utilization: ${r.itcUtilizationRatio.toFixed(1)}%`);
-  if (r.effectiveGstRate !== undefined) lines.push(`Effective GST Rate: ${r.effectiveGstRate.toFixed(2)}%`);
-  if (r.effectiveTaxRate !== undefined) lines.push(`Effective Income Tax Rate: ${r.effectiveTaxRate.toFixed(1)}%`);
-  if (r.tdsCoverageRatio !== undefined) lines.push(`TDS Coverage: ${r.tdsCoverageRatio.toFixed(1)}%`);
-  if (r.turnoverMatchScore !== undefined) lines.push(`GST–ITR Turnover Match: ${r.turnoverMatchScore}%`);
-  if (r.flags.length) { lines.push("", "=== RED FLAGS ==="); r.flags.forEach((f) => lines.push(`• ${f}`)); }
-  if (r.strengths.length) { lines.push("", "=== STRENGTHS ==="); r.strengths.forEach((s) => lines.push(`• ${s}`)); }
-  return lines.join("\n");
-}
-
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 18, gap: 14 },
-  header: { marginBottom: 4 },
-  brand: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 2, marginBottom: 4 },
-  title: { fontSize: 26, fontFamily: "Inter_700Bold", color: C.text },
-  subtitle: { fontSize: 12, color: C.textSecondary, marginTop: 2, fontFamily: "Inter_400Regular" },
+  scroll: { paddingHorizontal: 16, gap: 14 },
+  docRow: { flexDirection: "row", alignItems: "center", paddingVertical: 4 },
+  dot: { width: 5, height: 5, borderRadius: 3, marginRight: 8, marginTop: 1 },
+  docName: { fontSize: 12, color: "#C8DDF0", fontFamily: "Inter_600SemiBold" },
+  docDesc: { fontSize: 12, color: "#7A9BB5", fontFamily: "Inter_400Regular" },
 
-  uploadBtn: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.card, borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
-  uploadText: { flex: 1, fontSize: 13, color: C.textSecondary, fontFamily: "Inter_500Medium" },
-  fileChip: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#162032", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-  fileChipText: { flex: 1, fontSize: 12, color: C.text, fontFamily: "Inter_400Regular" },
-  fileChipFormat: { fontSize: 10, color: C.textSecondary, fontFamily: "Inter_400Regular" },
-
-  card: { backgroundColor: C.card, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: C.border, overflow: "hidden", gap: 4 },
-  cardAccent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3 },
-  cardTitle: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.text, marginBottom: 8 },
-
-  docRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 3 },
-  dot: { width: 5, height: 5, borderRadius: 3, marginTop: 1 },
-  docText: { fontSize: 12, color: C.textSecondary, fontFamily: "Inter_400Regular" },
-
-  calcBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 16, paddingVertical: 15 },
-  calcBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
-
-  scoreCard: { backgroundColor: C.card, borderRadius: 20, padding: 20, borderWidth: 1, flexDirection: "row", alignItems: "center" },
-  assessLabel: { fontSize: 10, color: C.textSecondary, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
-  scoreNum: { fontSize: 44, fontFamily: "Inter_700Bold" },
-  scoreMax: { fontSize: 16, color: C.textSecondary, fontFamily: "Inter_400Regular" },
-  docTypeText: { fontSize: 11, color: C.textSecondary, fontFamily: "Inter_400Regular", marginTop: 4 },
-  gradeText: { fontSize: 64, fontFamily: "Inter_700Bold" },
+  scoreCard: {
+    borderRadius: 20, padding: 20, borderWidth: 1, borderColor: "#1E3A54",
+    flexDirection: "row", alignItems: "center",
+  },
+  scoreSubtitle: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.5 },
+  scoreNum: { fontSize: 48, fontFamily: "Inter_700Bold", lineHeight: 52 },
+  scoreMax: { fontSize: 18, color: "#7A9BB5", fontFamily: "Inter_400Regular" },
+  docType: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular" },
+  gradeBadge: { width: 72, height: 72, borderRadius: 16, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
+  gradeText: { fontSize: 40, fontFamily: "Inter_700Bold" },
 
   metricsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  metricTile: { width: "47%", flexGrow: 1, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
-  metricLabel: { fontSize: 9, color: C.textSecondary, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 },
+  metricTile: { width: "47%", flexGrow: 1, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 14, alignItems: "center", gap: 6 },
+  metricLabel: { fontSize: 9, color: "#7A9BB5", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.4, textAlign: "center" },
   metricValue: { fontSize: 18, fontFamily: "Inter_700Bold" },
 
-  dataRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: "#1E2F40" },
-  dataLabel: { fontSize: 11, color: C.textSecondary, fontFamily: "Inter_400Regular" },
-  dataValue: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: C.text },
+  dataRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#1A2C3A" },
+  dataLabel: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular" },
+  dataValue: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#E8F4FF" },
 
-  flagText: { fontSize: 12, color: C.warning, fontFamily: "Inter_400Regular", lineHeight: 20 },
-  strengthText: { fontSize: 12, color: C.success, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  flagRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 6 },
+  flagText: { flex: 1, fontSize: 12, color: C.warning, fontFamily: "Inter_400Regular", lineHeight: 18 },
 
-  actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 14, paddingVertical: 14, borderWidth: 1 },
-  actionBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  exportBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 10, borderRadius: 14, paddingVertical: 14, borderWidth: 1, overflow: "hidden",
+  },
+  exportText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });
