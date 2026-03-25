@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Layout } from "@/components/Layout";
-import { parseBankingCsv } from "@/lib/parser";
+import { parseBankFile } from "@/lib/parser";
 import { calculateBanking } from "@/lib/calculations";
+import type { BankingData } from "@/lib/parser";
+import type { BankingResults } from "@/lib/calculations";
 import { exportToPDF } from "@/lib/pdf";
 import { UploadCloud, FileSpreadsheet, Calculator, Download, Save, Activity, CheckCircle, AlertOctagon } from "lucide-react";
-import type { BankingData, BankingResults, CaseInput } from "@workspace/api-client-react";
 import { useCreateCase } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -32,17 +33,23 @@ export default function BankingAnalysis() {
 
     setIsParsing(true);
     try {
-      const extracted = await parseBankingCsv(files[0]);
-      
-      Object.keys(extracted).forEach((key) => {
-        const k = key as keyof BankingData;
-        if (extracted[k] !== undefined) setValue(k, extracted[k]!);
+      const extracted = await parseBankFile(files[0]);
+
+      let fieldsFound = 0;
+      (Object.keys(extracted) as (keyof BankingData)[]).forEach((key) => {
+        if (extracted[key] !== undefined) {
+          setValue(key, extracted[key] as number);
+          fieldsFound++;
+        }
       });
 
-      toast({ title: "CSV Parsed", description: "Successfully extracted banking metrics." });
+      toast({
+        title: "Statement Parsed",
+        description: `Extracted ${fieldsFound} banking metrics. Please verify the values before calculating.`,
+      });
       handleCalculate();
     } catch (err) {
-      toast({ title: "Parsing Failed", description: "Could not read the CSV format.", variant: "destructive" });
+      toast({ title: "Parsing Failed", description: "Could not read the bank statement. Ensure it's a valid CSV.", variant: "destructive" });
     } finally {
       setIsParsing(false);
     }
@@ -61,11 +68,11 @@ export default function BankingAnalysis() {
 
   const handleSave = () => {
     if (!results) return;
-    const payload: CaseInput = {
+    const payload = {
       clientName: "Banking Client " + new Date().toLocaleDateString(),
-      caseType: "banking",
-      bankingData: getValues(),
-      bankingResults: results
+      caseType: "banking" as const,
+      bankingData: getValues() as any,
+      bankingResults: results as any,
     };
 
     createCase.mutate({ data: payload }, {

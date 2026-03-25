@@ -1,7 +1,7 @@
 import { useListCases } from "@workspace/api-client-react";
 import { Layout } from "@/components/Layout";
 import { ArrowUpRight, TrendingUp, AlertTriangle, CheckCircle, Activity, FileText } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, DonutChart, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Link } from "wouter";
 
 export default function Dashboard() {

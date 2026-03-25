@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Layout } from "@/components/Layout";
-import { extractWorkingCapitalFromText } from "@/lib/parser";
-import { calculateWorkingCapital } from "@/lib/calculations";
+import { parseFinancialFile } from "@/lib/parser";
+import { calculateWorkingCapital, getRatioStatus } from "@/lib/calculations";
+import type { WorkingCapitalData } from "@/lib/parser";
+import type { WorkingCapitalResults } from "@/lib/calculations";
 import { exportToPDF } from "@/lib/pdf";
-import { UploadCloud, FileText, Calculator, Download, Save, Info } from "lucide-react";
-import type { WorkingCapitalData, WorkingCapitalResults, CaseInput } from "@workspace/api-client-react";
+import { UploadCloud, FileText, Calculator, Download, Save, Info, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 import { useCreateCase } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,21 +34,35 @@ export default function WorkingCapital() {
     setIsParsing(true);
     try {
       const file = files[0];
-      const text = await file.text();
-      const extracted = extractWorkingCapitalFromText(text);
-      
-      // Update form
-      Object.keys(extracted).forEach((key) => {
-        const k = key as keyof WorkingCapitalData;
-        if (extracted[k] !== undefined) {
-          setValue(k, extracted[k]!);
+      const extracted = await parseFinancialFile(file);
+
+      let fieldsFound = 0;
+      (Object.keys(extracted) as (keyof WorkingCapitalData)[]).forEach((key) => {
+        if (extracted[key] !== undefined) {
+          setValue(key, extracted[key] as number);
+          fieldsFound++;
         }
       });
 
-      toast({ title: "Parsing Complete", description: "Successfully extracted metrics from document." });
-      handleCalculate();
+      if (fieldsFound === 0) {
+        toast({
+          title: "No Data Extracted",
+          description: "Could not find recognizable financial fields. Please check the file format or use manual input.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Parsing Complete",
+          description: `Successfully extracted ${fieldsFound} field(s) from document. Please verify values below.`,
+        });
+        handleCalculate();
+      }
     } catch (err) {
-      toast({ title: "Parsing Failed", description: "Could not read the document format.", variant: "destructive" });
+      toast({
+        title: "Parsing Failed",
+        description: "Could not read the document. Supported: .txt, .csv",
+        variant: "destructive",
+      });
     } finally {
       setIsParsing(false);
     }
@@ -71,11 +86,11 @@ export default function WorkingCapital() {
       return;
     }
     
-    const payload: CaseInput = {
+    const payload = {
       clientName: "New Client " + new Date().toLocaleDateString(),
-      caseType: "working_capital",
-      workingCapitalData: getValues(),
-      workingCapitalResults: results
+      caseType: "working_capital" as const,
+      workingCapitalData: getValues() as any,
+      workingCapitalResults: results as any,
     };
 
     createCase.mutate({ data: payload }, {
