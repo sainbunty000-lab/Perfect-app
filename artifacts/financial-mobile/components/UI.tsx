@@ -1,16 +1,114 @@
 /**
- * Shared UI components — match the web app's dark navy/teal glassmorphism theme
+ * Shared UI components — dark navy/teal glassmorphism theme
  */
 import React from "react";
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
   type ViewStyle, type TextStyle,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 
 const C = Colors.light;
+
+// ── Tab navigation order ───────────────────────────────────────────────────────
+export const TAB_ORDER: { name: string; label: string }[] = [
+  { name: "home",      label: "Dashboard" },
+  { name: "index",     label: "WC Analysis" },
+  { name: "banking",   label: "Banking" },
+  { name: "multiyear", label: "Multi-Year" },
+  { name: "gst-itr",  label: "GST & ITR" },
+  { name: "saved",     label: "Saved" },
+];
+
+// ── Next / Back navigation bar ─────────────────────────────────────────────────
+export function TabNavBar({ current }: { current: string }) {
+  const router = useRouter();
+  const idx = TAB_ORDER.findIndex((t) => t.name === current);
+  const prev = idx > 0 ? TAB_ORDER[idx - 1] : null;
+  const next = idx < TAB_ORDER.length - 1 ? TAB_ORDER[idx + 1] : null;
+
+  const goTo = (name: string) => {
+    if (name === "index") router.push("/(tabs)/");
+    else router.push(`/(tabs)/${name}` as any);
+  };
+
+  return (
+    <View style={navStyles.bar}>
+      <TouchableOpacity
+        style={[navStyles.btn, !prev && navStyles.disabled]}
+        onPress={() => prev && goTo(prev.name)}
+        disabled={!prev}
+        activeOpacity={0.7}
+      >
+        <Feather name="arrow-left" size={15} color={prev ? C.primary : "#2A3D52"} />
+        <Text style={[navStyles.btnText, { color: prev ? C.primary : "#2A3D52" }]}>
+          {prev ? prev.label : "—"}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Step dots */}
+      <View style={navStyles.dots}>
+        {TAB_ORDER.map((t, i) => (
+          <TouchableOpacity key={t.name} onPress={() => goTo(t.name)} hitSlop={6}>
+            <View
+              style={[
+                navStyles.dot,
+                i === idx && navStyles.dotActive,
+                i < idx && navStyles.dotDone,
+              ]}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <TouchableOpacity
+        style={[navStyles.btn, navStyles.btnRight, !next && navStyles.disabled]}
+        onPress={() => next && goTo(next.name)}
+        disabled={!next}
+        activeOpacity={0.7}
+      >
+        <Text style={[navStyles.btnText, { color: next ? C.accent : "#2A3D52" }]}>
+          {next ? next.label : "—"}
+        </Text>
+        <Feather name="arrow-right" size={15} color={next ? C.accent : "#2A3D52"} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const navStyles = StyleSheet.create({
+  bar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#0F1B2A",
+    borderWidth: 1,
+    borderColor: "#1E3A54",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginTop: 6,
+  },
+  btn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    minWidth: 88,
+  },
+  btnRight: { justifyContent: "flex-end" },
+  disabled: { opacity: 0.35 },
+  btnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  dots: { flexDirection: "row", gap: 6, alignItems: "center" },
+  dot: {
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: "#1E3A54",
+  },
+  dotActive: { width: 18, borderRadius: 4, backgroundColor: C.accent },
+  dotDone: { backgroundColor: C.primary + "88" },
+});
 
 // ── Full-page gradient background ─────────────────────────────────────────────
 export function PageBackground({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
@@ -26,22 +124,17 @@ export function PageBackground({ children, style }: { children: React.ReactNode;
   );
 }
 
-// ── Page header with brand + gradient accent bar ───────────────────────────────
+// ── Page header ────────────────────────────────────────────────────────────────
 export function PageHeader({
-  title,
-  subtitle,
-  accentColor = C.primary,
+  title, subtitle, accentColor = C.primary,
 }: {
-  title: string;
-  subtitle?: string;
-  accentColor?: string;
+  title: string; subtitle?: string; accentColor?: string;
 }) {
   return (
     <View style={hStyles.wrapper}>
       <LinearGradient
         colors={[accentColor + "22", "transparent"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
         style={hStyles.accent}
       />
       <Text style={hStyles.brand}>DHANUSH ENTERPRISES</Text>
@@ -53,58 +146,24 @@ export function PageHeader({
 
 const hStyles = StyleSheet.create({
   wrapper: {
-    borderRadius: 20,
-    overflow: "hidden",
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#1E3048",
-    backgroundColor: "#131F30",
-    marginBottom: 2,
+    borderRadius: 20, overflow: "hidden", padding: 20,
+    borderWidth: 1, borderColor: "#1E3048",
+    backgroundColor: "#131F30", marginBottom: 2,
   },
-  accent: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-  },
-  brand: {
-    fontSize: 9,
-    fontFamily: "Inter_700Bold",
-    color: C.primary,
-    letterSpacing: 2.5,
-    marginBottom: 6,
-    textTransform: "uppercase",
-  },
-  title: {
-    fontSize: 28,
-    fontFamily: "Inter_700Bold",
-    color: "#E8F4FF",
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: C.textSecondary,
-    marginTop: 4,
-    fontFamily: "Inter_400Regular",
-  },
+  accent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 4 },
+  brand: { fontSize: 9, fontFamily: "Inter_700Bold", color: C.primary, letterSpacing: 2.5, marginBottom: 6, textTransform: "uppercase" },
+  title: { fontSize: 28, fontFamily: "Inter_700Bold", color: "#E8F4FF", letterSpacing: -0.3 },
+  subtitle: { fontSize: 13, color: C.textSecondary, marginTop: 4, fontFamily: "Inter_400Regular" },
 });
 
-// ── Glass card ────────────────────────────────────────────────────────────────
-export function GlassCard({
-  children,
-  accentColor,
-  style,
-}: {
-  children: React.ReactNode;
-  accentColor?: string;
-  style?: ViewStyle;
+// ── Glass card ─────────────────────────────────────────────────────────────────
+export function GlassCard({ children, accentColor, style }: {
+  children: React.ReactNode; accentColor?: string; style?: ViewStyle;
 }) {
   return (
     <LinearGradient
       colors={["#1A2C42", "#152236"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
       style={[gStyles.card, style]}
     >
       {accentColor && <View style={[gStyles.bar, { backgroundColor: accentColor }]} />}
@@ -114,52 +173,21 @@ export function GlassCard({
 }
 
 const gStyles = StyleSheet.create({
-  card: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#1E3A54",
-    overflow: "hidden",
-    padding: 18,
-  },
-  bar: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-    borderTopLeftRadius: 20,
-    borderBottomLeftRadius: 20,
-  },
+  card: { borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54", overflow: "hidden", padding: 18 },
+  bar: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 },
 });
 
-// ── Upload zone (dashed border) ───────────────────────────────────────────────
+// ── Upload zone (dashed) ───────────────────────────────────────────────────────
 export function UploadZone({
-  onPress,
-  loading,
-  uploaded,
-  fileName,
-  label,
-  accentColor = C.primary,
-  onClear,
+  onPress, loading, uploaded, fileName, label, accentColor = C.primary, onClear,
 }: {
-  onPress: () => void;
-  loading?: boolean;
-  uploaded?: boolean;
-  fileName?: string;
-  label: string;
-  accentColor?: string;
-  onClear?: () => void;
+  onPress: () => void; loading?: boolean; uploaded?: boolean;
+  fileName?: string; label: string; accentColor?: string; onClear?: () => void;
 }) {
   return (
     <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.8}
-      disabled={loading}
-      style={[
-        uStyles.zone,
-        uploaded && { borderColor: C.success + "66", borderStyle: "solid" },
-        { borderColor: uploaded ? C.success + "66" : accentColor + "55" },
-      ]}
+      onPress={onPress} activeOpacity={0.8} disabled={loading}
+      style={[uStyles.zone, { borderColor: uploaded ? C.success + "66" : accentColor + "55", borderStyle: uploaded ? "solid" : "dashed" }]}
     >
       <LinearGradient
         colors={uploaded ? [C.success + "12", C.success + "06"] : [accentColor + "14", accentColor + "06"]}
@@ -168,7 +196,7 @@ export function UploadZone({
       <View style={uStyles.row}>
         {loading ? (
           <View style={[uStyles.iconBox, { backgroundColor: accentColor + "22" }]}>
-            <Feather name="loader" size={18} color={accentColor} />
+            <ActivityIndicator size="small" color={accentColor} />
           </View>
         ) : uploaded ? (
           <View style={[uStyles.iconBox, { backgroundColor: C.success + "22" }]}>
@@ -179,10 +207,7 @@ export function UploadZone({
             <Feather name="upload-cloud" size={18} color={accentColor} />
           </View>
         )}
-        <Text
-          style={[uStyles.label, { color: uploaded ? C.text : C.textSecondary }]}
-          numberOfLines={1}
-        >
+        <Text style={[uStyles.label, { color: uploaded ? C.text : C.textSecondary }]} numberOfLines={1}>
           {loading ? "Parsing document…" : uploaded ? fileName : label}
         </Text>
         {uploaded && onClear && (
@@ -190,54 +215,35 @@ export function UploadZone({
             <Feather name="x" size={16} color={C.textSecondary} />
           </TouchableOpacity>
         )}
-        {!uploaded && !loading && (
-          <Feather name="chevron-right" size={16} color={accentColor} />
-        )}
+        {!uploaded && !loading && <Feather name="chevron-right" size={16} color={accentColor} />}
       </View>
     </TouchableOpacity>
   );
 }
 
 const uStyles = StyleSheet.create({
-  zone: {
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderStyle: "dashed",
-    overflow: "hidden",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
+  zone: { borderRadius: 16, borderWidth: 1.5, overflow: "hidden", paddingHorizontal: 16, paddingVertical: 14 },
   row: { flexDirection: "row", alignItems: "center", gap: 12 },
   iconBox: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   label: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium" },
 });
 
-// ── Primary action button with gradient ───────────────────────────────────────
+// ── Gradient button ────────────────────────────────────────────────────────────
 export function GradientButton({
-  onPress,
-  label,
-  icon,
-  loading,
-  colors: gradColors,
-  textColor = "#fff",
+  onPress, label, icon, loading, colors: gradColors, textColor = "#fff",
 }: {
-  onPress: () => void;
-  label: string;
-  icon?: string;
-  loading?: boolean;
-  colors?: [string, string];
-  textColor?: string;
+  onPress: () => void; label: string; icon?: string;
+  loading?: boolean; colors?: [string, string]; textColor?: string;
 }) {
   const gc: [string, string] = gradColors ?? [C.primary, "#1890A8"];
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.88} disabled={loading}>
-      <LinearGradient
-        colors={gc}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={bStyles.btn}
-      >
-        {icon && !loading && <Feather name={icon as any} size={18} color={textColor} />}
+      <LinearGradient colors={gc} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={bStyles.btn}>
+        {loading
+          ? <ActivityIndicator size="small" color={textColor} />
+          : icon
+          ? <Feather name={icon as any} size={18} color={textColor} />
+          : null}
         <Text style={[bStyles.label, { color: textColor }]}>{label}</Text>
       </LinearGradient>
     </TouchableOpacity>
@@ -245,32 +251,14 @@ export function GradientButton({
 }
 
 const bStyles = StyleSheet.create({
-  btn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    borderRadius: 16,
-    paddingVertical: 16,
-  },
+  btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 16, paddingVertical: 16 },
   label: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
 });
 
-// ── KPI metric tile ───────────────────────────────────────────────────────────
-export function MetricTile({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string;
-  color?: string;
-}) {
+// ── KPI metric tile ────────────────────────────────────────────────────────────
+export function MetricTile({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <LinearGradient
-      colors={["#1A2C42", "#152236"]}
-      style={mStyles.tile}
-    >
+    <LinearGradient colors={["#1A2C42", "#152236"]} style={mStyles.tile}>
       <Text style={mStyles.label}>{label}</Text>
       <Text style={[mStyles.value, { color: color ?? C.text }]}>{value}</Text>
     </LinearGradient>
@@ -278,29 +266,9 @@ export function MetricTile({
 }
 
 const mStyles = StyleSheet.create({
-  tile: {
-    flex: 1,
-    minWidth: "29%",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#1E3A54",
-    padding: 14,
-    alignItems: "center",
-    gap: 6,
-  },
-  label: {
-    fontSize: 9,
-    color: C.textSecondary,
-    fontFamily: "Inter_500Medium",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    textAlign: "center",
-  },
-  value: {
-    fontSize: 17,
-    fontFamily: "Inter_700Bold",
-    textAlign: "center",
-  },
+  tile: { flex: 1, minWidth: "29%", borderRadius: 16, borderWidth: 1, borderColor: "#1E3A54", padding: 14, alignItems: "center", gap: 6 },
+  label: { fontSize: 9, color: C.textSecondary, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.6, textAlign: "center" },
+  value: { fontSize: 17, fontFamily: "Inter_700Bold", textAlign: "center" },
 });
 
 // ── Section card title ─────────────────────────────────────────────────────────
@@ -311,5 +279,4 @@ const ctStyles = StyleSheet.create({
   t: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#C8DDF0", marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.5 },
 });
 
-// ── Shared input row ───────────────────────────────────────────────────────────
 export { default as Colors } from "@/constants/colors";

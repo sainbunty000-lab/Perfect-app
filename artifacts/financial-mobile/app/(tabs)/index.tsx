@@ -15,7 +15,7 @@ import type { WorkingCapitalData, WorkingCapitalResults } from "@/lib/calculatio
 import { parseFinancialDocument, FORMAT_LABEL } from "@/lib/parseViaApi";
 import { exportWorkingCapitalPDF } from "@/lib/pdfExport";
 import { useCreateCase } from "@workspace/api-client-react";
-import { PageBackground, PageHeader } from "@/components/UI";
+import { PageBackground, PageHeader, TabNavBar } from "@/components/UI";
 
 const C = Colors.light;
 
@@ -308,6 +308,7 @@ export default function WorkingCapitalScreen() {
             </View>
           </>
         )}
+        <TabNavBar current="index" />
       </ScrollView>
 
       {/* Save Modal */}

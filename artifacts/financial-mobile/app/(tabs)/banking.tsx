@@ -18,7 +18,7 @@ import { exportBankingPDF } from "@/lib/pdfExport";
 import { useCreateCase } from "@workspace/api-client-react";
 import {
   PageBackground, PageHeader, GlassCard, UploadZone,
-  GradientButton, CardTitle,
+  GradientButton, CardTitle, TabNavBar,
 } from "@/components/UI";
 
 const C = Colors.light;
@@ -284,6 +284,7 @@ export default function BankingScreen() {
               </View>
             </>
           )}
+          <TabNavBar current="banking" />
         </ScrollView>
       </PageBackground>
 

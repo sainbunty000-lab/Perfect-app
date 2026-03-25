@@ -9,7 +9,7 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useListCases, useDeleteCase } from "@workspace/api-client-react";
 import Colors from "@/constants/colors";
-import { PageBackground } from "@/components/UI";
+import { PageBackground, TabNavBar } from "@/components/UI";
 
 const C = Colors.light;
 const INR = (n?: number) => n !== undefined ? "₹" + Math.abs(n).toLocaleString("en-IN") : "—";
@@ -68,7 +68,8 @@ export default function SavedCasesScreen() {
       <FlatList
         data={caseList}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={[styles.list, { paddingBottom: tabBarHeight + 24 }]}
+        contentContainerStyle={[styles.list, { paddingBottom: tabBarHeight + 16 }]}
+        ListFooterComponent={<TabNavBar current="saved" />}
         showsVerticalScrollIndicator={false}
         scrollEnabled
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}

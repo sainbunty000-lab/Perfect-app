@@ -14,7 +14,7 @@ import { parseFinancialDocument, FORMAT_LABEL } from "@/lib/parseViaApi";
 import { exportGstItrPDF } from "@/lib/pdfExport";
 import {
   PageBackground, PageHeader, GlassCard, UploadZone,
-  GradientButton, CardTitle,
+  GradientButton, CardTitle, TabNavBar,
 } from "@/components/UI";
 
 const C = Colors.light;
@@ -412,6 +412,7 @@ export default function GstItrScreen() {
               </TouchableOpacity>
             </>
           )}
+          <TabNavBar current="gst-itr" />
         </ScrollView>
       </PageBackground>
     </KeyboardAvoidingView>
