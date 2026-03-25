@@ -3,20 +3,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-// Pages
 import Dashboard from "./pages/dashboard";
 import WorkingCapital from "./pages/working-capital";
 import BankingAnalysis from "./pages/banking-analysis";
 import GstItr from "./pages/gst-itr";
+import MultiYear from "./pages/multi-year";
 import Storage from "./pages/storage";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: false,
-    },
+    queries: { refetchOnWindowFocus: false, retry: false },
   },
 });
 
@@ -27,13 +24,14 @@ function Router() {
       <Route path="/working-capital" component={WorkingCapital} />
       <Route path="/banking-analysis" component={BankingAnalysis} />
       <Route path="/gst-itr" component={GstItr} />
+      <Route path="/multi-year" component={MultiYear} />
       <Route path="/storage" component={Storage} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -45,5 +43,3 @@ function App() {
     </QueryClientProvider>
   );
 }
-
-export default App;

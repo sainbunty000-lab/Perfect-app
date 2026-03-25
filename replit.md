@@ -16,12 +16,33 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 
+## Dhanush Enterprises — Financial Intelligence Platform
+
+### Web App (`artifacts/financial-analyzer`)
+- **Dashboard** — combined module view, dynamic AI-generated summary paragraph, session aggregation from localStorage, KPI cards, risk distribution chart, recent saved cases table
+- **Working Capital** — Balance Sheet + P&L file upload (PDF/Excel/Image OCR/TXT), ratio calculations, eligibility, localStorage session save (`de_wc_session`)
+- **Banking Analysis** — bank statement parsing, 35+ Indian bank detection, BankDetectionPanel, drag-and-drop upload, localStorage session save (`de_banking_session`)
+- **GST & ITR** — GSTR-3B + ITR document parsing, analysis
+- **Multi-Year Analysis** — 1–3 year upload slots, trend engine (Increasing/Decreasing/Fluctuating), weighted + growth-adjusted eligibility, LineChart/BarChart visualizations, localStorage saves (`de_multiyear_session`, `de_multiyear_cases`)
+- **Case Storage** — DB cases + localStorage multi-year cases, module type filter badges, view/delete actions
+
+### Key Libraries
+- `artifacts/financial-analyzer/src/lib/parser.ts` — `parseFinancialFile()`, `parseBankFileWithInfo()`, `detectBankInfo()`, `extractWorkingCapitalFromText()`
+- `artifacts/financial-analyzer/src/lib/multi-year-calculations.ts` — `calculateMultiYear()`, `generateSummaryParagraph()`
+- `artifacts/financial-analyzer/src/lib/calculations.ts` — `calculateWorkingCapital()`, `calculateBanking()`
+- `artifacts/financial-analyzer/src/lib/gst-itr-parser.ts` — `parseGstItrFile()`, `analyzeGstItr()`
+
+### Mobile App (`artifacts/financial-mobile`)
+- Expo React Native app mirroring web modules, sends files to `/api/parse-document`
+
 ## Structure
 
 ```text
 artifacts-monorepo/
 ├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
+│   ├── api-server/         # Express API server
+│   ├── financial-analyzer/ # React+Vite web app (Dhanush Enterprises)
+│   └── financial-mobile/   # Expo React Native mobile app
 ├── lib/                    # Shared libraries
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks

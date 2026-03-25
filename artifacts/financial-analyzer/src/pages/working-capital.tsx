@@ -149,6 +149,8 @@ export default function WorkingCapital() {
     });
     const res = calculateWorkingCapital(cleanData);
     setResults(res);
+    // Persist session for Dashboard aggregation
+    localStorage.setItem("de_wc_session", JSON.stringify({ ts: Date.now(), results: res }));
   };
 
   const handleSave = () => {

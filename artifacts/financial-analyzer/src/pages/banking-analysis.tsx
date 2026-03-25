@@ -109,7 +109,10 @@ export default function BankingAnalysis() {
     Object.keys(data).forEach((k) => {
       cleanData[k as keyof BankingData] = Number(data[k as keyof BankingData]) || 0;
     });
-    setResults(calculateBanking(cleanData));
+    const bankRes = calculateBanking(cleanData);
+    setResults(bankRes);
+    // Persist session for Dashboard aggregation
+    localStorage.setItem("de_banking_session", JSON.stringify({ ts: Date.now(), results: bankRes }));
   };
 
   const handleSave = () => {
