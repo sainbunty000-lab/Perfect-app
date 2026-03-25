@@ -741,6 +741,97 @@ function parseTextBankStatement(text: string): Partial<BankingData> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Bank Statement Intelligence — detects bank name, account, and statement period
+// from any extracted text (PDF, CSV, OCR, Excel)
+// ─────────────────────────────────────────────────────────────────────────────
+export interface BankStatementInfo {
+  bankName?: string;
+  accountNumber?: string;
+  statementPeriod?: string;
+  accountType?: string;
+}
+
+export function detectBankInfo(text: string): BankStatementInfo {
+  const full = text.toLowerCase();
+
+  // ── Bank name ────────────────────────────────────────────────────────────
+  let bankName: string | undefined;
+  const BANKS: Array<[string[], string]> = [
+    [["hdfc bank", "hdfcbank"], "HDFC Bank"],
+    [["state bank of india", "state bank", "sbi branch", "sbimb"], "State Bank of India"],
+    [["icici bank", "icicib"], "ICICI Bank"],
+    [["axis bank", "axisbank"], "Axis Bank"],
+    [["kotak mahindra bank", "kotak bank", "kotak mahindra", "kotakbank"], "Kotak Mahindra Bank"],
+    [["punjab national bank", "pnb bank", " pnb "], "Punjab National Bank"],
+    [["bank of baroda", "bob bank", "bankofbaroda"], "Bank of Baroda"],
+    [["canara bank", "canarabank"], "Canara Bank"],
+    [["union bank of india", "union bank"], "Union Bank of India"],
+    [["indusind bank", "indusind"], "IndusInd Bank"],
+    [["yes bank", "yesbank"], "Yes Bank"],
+    [["idfc first bank", "idfc bank", "idfcfirst"], "IDFC First Bank"],
+    [["federal bank", "federalbank"], "Federal Bank"],
+    [["south indian bank", "sib bank"], "South Indian Bank"],
+    [["bank of india", "boi bank"], "Bank of India"],
+    [["central bank of india", "central bank"], "Central Bank of India"],
+    [["indian bank", "indianbank"], "Indian Bank"],
+    [["indian overseas bank", "iob bank"], "Indian Overseas Bank"],
+    [["uco bank", "ucobank"], "UCO Bank"],
+    [["syndicate bank"], "Syndicate Bank"],
+    [["dena bank"], "Dena Bank"],
+    [["vijaya bank"], "Vijaya Bank"],
+    [["rbl bank", "ratnakar bank"], "RBL Bank"],
+    [["dcb bank", "development credit bank"], "DCB Bank"],
+    [["city union bank", "cub bank"], "City Union Bank"],
+    [["karur vysya bank", "kvb bank"], "Karur Vysya Bank"],
+    [["tamilnad mercantile bank", "tmb bank"], "Tamilnad Mercantile Bank"],
+    [["bandhan bank", "bandhanbank"], "Bandhan Bank"],
+    [["au small finance bank", "au bank"], "AU Small Finance Bank"],
+    [["jana small finance bank", "jana bank"], "Jana Small Finance Bank"],
+    [["equitas small finance bank", "equitas bank"], "Equitas Small Finance Bank"],
+    [["ujjivan small finance bank", "ujjivan bank"], "Ujjivan Small Finance Bank"],
+    [["citibank", "citi bank"], "Citibank"],
+    [["standard chartered bank", "sc bank", "standard chartered"], "Standard Chartered Bank"],
+    [["hsbc bank", "hsbc"], "HSBC Bank"],
+    [["deutsche bank"], "Deutsche Bank"],
+    [["dbs bank", "digibank"], "DBS Bank"],
+  ];
+  for (const [patterns, name] of BANKS) {
+    if (patterns.some((p) => full.includes(p))) { bankName = name; break; }
+  }
+
+  // ── Account number ────────────────────────────────────────────────────────
+  // Match masked (XXXX1234) or full account numbers
+  const acMatches = [
+    text.match(/(?:account\s*(?:no\.?|number|#)?|a\/c\s*(?:no\.?|#)?)[:\s]+([Xx*\d]{4,}[\d]{4})/i),
+    text.match(/(?:account\s*(?:no\.?|number)?)[:\s]+(\d{9,18})/i),
+    text.match(/\b([Xx*]{4,}\d{4})\b/),
+  ];
+  const accountNumber = acMatches.find(Boolean)?.[1];
+
+  // ── Statement period ──────────────────────────────────────────────────────
+  const periodPatterns = [
+    /(?:statement\s+period|from|period)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s+to\s+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+    /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})\s+to\s+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/,
+    /(?:from\s*date|from)[:\s]+(\d{2}\/\d{2}\/\d{4}).*?(?:to\s*date|to)[:\s]+(\d{2}\/\d{2}\/\d{4})/i,
+  ];
+  let statementPeriod: string | undefined;
+  for (const pat of periodPatterns) {
+    const m = text.match(pat);
+    if (m) { statementPeriod = `${m[1]} to ${m[2]}`; break; }
+  }
+
+  // ── Account type ──────────────────────────────────────────────────────────
+  let accountType: string | undefined;
+  if (full.includes("savings account") || full.includes("sb a/c") || full.includes("savings a/c")) accountType = "Savings Account";
+  else if (full.includes("current account") || full.includes("ca a/c") || full.includes("current a/c")) accountType = "Current Account";
+  else if (full.includes("cash credit") || full.includes("cc account") || full.includes("cc a/c")) accountType = "Cash Credit";
+  else if (full.includes("overdraft") || full.includes("od account") || full.includes("od a/c")) accountType = "Overdraft Account";
+  else if (full.includes("fixed deposit") || full.includes("fd account")) accountType = "Fixed Deposit";
+
+  return { bankName, accountNumber, statementPeriod, accountType };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Auto-detect format and dispatch to right parser
 // ─────────────────────────────────────────────────────────────────────────────
 export async function parseBankFile(file: File): Promise<Partial<BankingData>> {
@@ -779,4 +870,43 @@ export async function parseFinancialFile(file: File): Promise<WorkingCapitalData
 
 export function parseFinancialText(text: string): WorkingCapitalData {
   return extractWorkingCapitalFromText(text);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// parseBankFileWithInfo — returns BOTH parsed metrics AND bank identity info
+// Use this in the banking analysis UI so the user can verify the detected bank
+// ─────────────────────────────────────────────────────────────────────────────
+export async function parseBankFileWithInfo(
+  file: File
+): Promise<{ data: Partial<BankingData>; info: BankStatementInfo }> {
+  const name = file.name.toLowerCase();
+
+  if (name.endsWith(".csv")) {
+    const rawText = await file.text();
+    const data = await parseBankingCsv(file);
+    return { data, info: detectBankInfo(rawText) };
+  }
+
+  const { extractTextFromFile } = await import("./fileReader");
+  const text = await extractTextFromFile(file);
+  const info = detectBankInfo(text);
+
+  const firstFewLines = text.split("\n").slice(0, 5).join("\n");
+  const commaCount = (firstFewLines.match(/,/g) || []).length;
+  const hasCsvHeader =
+    commaCount >= 5 &&
+    (firstFewLines.toLowerCase().includes("date") ||
+     firstFewLines.toLowerCase().includes("narration") ||
+     firstFewLines.toLowerCase().includes("debit") ||
+     firstFewLines.toLowerCase().includes("credit"));
+
+  let data: Partial<BankingData>;
+  if (hasCsvHeader) {
+    const csvBlob = new File([text], "statement.csv", { type: "text/csv" });
+    data = await parseBankingCsv(csvBlob);
+  } else {
+    data = parseTextBankStatement(text);
+  }
+
+  return { data, info };
 }
