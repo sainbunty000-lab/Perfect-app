@@ -1,5 +1,13 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import { writeFile, unlink } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
+import { randomBytes } from "crypto";
+
+const execFileAsync = promisify(execFile);
 
 const router: IRouter = Router();
 
@@ -7,6 +15,27 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 30 * 1024 * 1024 }, // 30 MB max
 });
+
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  const tmpFile = join(tmpdir(), `parse-${randomBytes(8).toString("hex")}.pdf`);
+  try {
+    await writeFile(tmpFile, buffer);
+    // pdftotext can exit non-zero with warnings but still produce good output
+    let stdout = "";
+    try {
+      const result = await execFileAsync("pdftotext", ["-layout", tmpFile, "-"], {
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      stdout = result.stdout ?? "";
+    } catch (err: any) {
+      // Even on error, stdout may contain extracted text
+      stdout = err?.stdout ?? "";
+    }
+    return stdout;
+  } finally {
+    await unlink(tmpFile).catch(() => {});
+  }
+}
 
 router.post("/parse-document", upload.single("file"), async (req, res) => {
   if (!req.file) {
@@ -39,10 +68,7 @@ router.post("/parse-document", upload.single("file"), async (req, res) => {
 
     if (isPdf) {
       format = "pdf";
-      // pdf-parse is CJS — dynamic import works with esbuild bundle
-      const pdfParse = (await import("pdf-parse")).default;
-      const result = await pdfParse(buffer);
-      text = result.text ?? "";
+      text = await extractPdfText(buffer);
     } else if (isExcel) {
       format = "excel";
       const XLSX = await import("xlsx");

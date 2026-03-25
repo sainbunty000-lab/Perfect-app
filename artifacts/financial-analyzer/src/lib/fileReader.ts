@@ -12,10 +12,12 @@
 async function extractFromPDF(file: File): Promise<string> {
   const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
 
-  // Use CDN worker to avoid Vite worker bundling complexity
+  // Use the locally bundled worker — avoids CDN version mismatch issues
   if (!GlobalWorkerOptions.workerSrc) {
-    GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.mjs";
+    GlobalWorkerOptions.workerSrc = new URL(
+      "pdfjs-dist/build/pdf.worker.min.mjs",
+      import.meta.url
+    ).href;
   }
 
   const arrayBuffer = await file.arrayBuffer();
