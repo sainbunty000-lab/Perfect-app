@@ -146,25 +146,41 @@ export default function GstItrScreen() {
   const [itrParsing,  setItrParsing]  = useState(false);
   const [exporting,   setExporting]   = useState(false);
 
-  const [gstrSlot, setGstrSlot] = useState<SlotInfo>(null);
-  const [itrSlot,  setItrSlot]  = useState<SlotInfo>(null);
+  const [gstrAsset, setGstrAsset] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [itrAsset,  setItrAsset]  = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [gstrSlot, setGstrSlot]   = useState<SlotInfo>(null);
+  const [itrSlot,  setItrSlot]    = useState<SlotInfo>(null);
 
   const [gstrData, setGstrData] = useState<GstrFields | undefined>();
   const [itrData,  setItrData]  = useState<ItrFields | undefined>();
   const [result,   setResult]   = useState<AnalysisResult | null>(null);
 
-  const handlePickGstr = async () => {
+  // Step 1: select file only
+  const handleSelectGstr = async () => {
     try {
       const res = await DocumentPicker.getDocumentAsync({ type: ["*/*"], copyToCacheDirectory: true, multiple: false });
       if (res.canceled) return;
-      const asset = res.assets[0];
-      setGstrParsing(true);
+      setGstrAsset(res.assets[0]); setGstrSlot(null); setResult(null);
+    } catch { Alert.alert("Error", "Could not open file picker."); }
+  };
 
-      // Server-side GSTR extraction
-      const parsed = await parseFinancialDocument(asset.uri, asset.name, asset.mimeType ?? undefined, "gstr");
+  const handleSelectItr = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({ type: ["*/*"], copyToCacheDirectory: true, multiple: false });
+      if (res.canceled) return;
+      setItrAsset(res.assets[0]); setItrSlot(null); setResult(null);
+    } catch { Alert.alert("Error", "Could not open file picker."); }
+  };
+
+  // Step 2: parse the selected file
+  const handleParseGstr = async () => {
+    if (!gstrAsset) return;
+    setGstrParsing(true);
+    try {
+      const parsed = await parseFinancialDocument(gstrAsset.uri, gstrAsset.name, gstrAsset.mimeType ?? undefined, "gstr");
       const f = parsed.fields as GstrFields;
       setGstrData((prev) => ({ ...prev, ...f }));
-      setGstrSlot({ name: asset.name, format: FORMAT_LABEL[parsed.format] });
+      setGstrSlot({ name: gstrAsset.name, format: FORMAT_LABEL[parsed.format] });
       setResult(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: any) {
@@ -173,18 +189,14 @@ export default function GstItrScreen() {
     } finally { setGstrParsing(false); }
   };
 
-  const handlePickItr = async () => {
+  const handleParseItr = async () => {
+    if (!itrAsset) return;
+    setItrParsing(true);
     try {
-      const res = await DocumentPicker.getDocumentAsync({ type: ["*/*"], copyToCacheDirectory: true, multiple: false });
-      if (res.canceled) return;
-      const asset = res.assets[0];
-      setItrParsing(true);
-
-      // Server-side ITR extraction
-      const parsed = await parseFinancialDocument(asset.uri, asset.name, asset.mimeType ?? undefined, "itr");
+      const parsed = await parseFinancialDocument(itrAsset.uri, itrAsset.name, itrAsset.mimeType ?? undefined, "itr");
       const f = parsed.fields as ItrFields;
       setItrData((prev) => ({ ...prev, ...f }));
-      setItrSlot({ name: asset.name, format: FORMAT_LABEL[parsed.format] });
+      setItrSlot({ name: itrAsset.name, format: FORMAT_LABEL[parsed.format] });
       setResult(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: any) {
@@ -240,13 +252,15 @@ export default function GstItrScreen() {
             </View>
 
             <UploadZone
-              onPress={handlePickGstr}
+              onPress={handleSelectGstr}
               loading={gstrParsing}
               uploaded={!!gstrSlot}
-              fileName={gstrSlot?.name}
-              label="Upload GSTR Document (PDF / Excel / Image)"
+              fileSelected={!!gstrAsset && !gstrSlot}
+              fileName={gstrAsset?.name ?? gstrSlot?.name}
+              label="Select GSTR Document (PDF / Excel / Image)"
               accentColor={PURPLE}
-              onClear={() => { setGstrSlot(null); setGstrData(undefined); setResult(null); }}
+              onParse={handleParseGstr}
+              onClear={() => { setGstrAsset(null); setGstrSlot(null); setGstrData(undefined); setResult(null); }}
             />
 
             {gstrData && (
@@ -282,13 +296,15 @@ export default function GstItrScreen() {
             </View>
 
             <UploadZone
-              onPress={handlePickItr}
+              onPress={handleSelectItr}
               loading={itrParsing}
               uploaded={!!itrSlot}
-              fileName={itrSlot?.name}
-              label="Upload ITR Document (PDF / Excel / Image)"
+              fileSelected={!!itrAsset && !itrSlot}
+              fileName={itrAsset?.name ?? itrSlot?.name}
+              label="Select ITR Document (PDF / Excel / Image)"
               accentColor={BLUE}
-              onClear={() => { setItrSlot(null); setItrData(undefined); setResult(null); }}
+              onParse={handleParseItr}
+              onClear={() => { setItrAsset(null); setItrSlot(null); setItrData(undefined); setResult(null); }}
             />
 
             {itrData && (

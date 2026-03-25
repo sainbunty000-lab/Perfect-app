@@ -179,53 +179,102 @@ const gStyles = StyleSheet.create({
 
 // ── Upload zone (dashed) ───────────────────────────────────────────────────────
 export function UploadZone({
-  onPress, loading, uploaded, fileName, label, accentColor = C.primary, onClear,
+  onPress, loading, uploaded, fileSelected, fileName, label, accentColor = C.primary, onClear, onParse,
 }: {
-  onPress: () => void; loading?: boolean; uploaded?: boolean;
-  fileName?: string; label: string; accentColor?: string; onClear?: () => void;
+  onPress: () => void; loading?: boolean; uploaded?: boolean; fileSelected?: boolean;
+  fileName?: string; label: string; accentColor?: string; onClear?: () => void; onParse?: () => void;
 }) {
+  const isReady = fileSelected && !uploaded && !loading;
+  const borderColor = uploaded ? C.success + "66" : isReady ? "#F5C842AA" : accentColor + "55";
+  const borderStyle = uploaded || isReady ? "solid" : "dashed";
+  const bgFrom = uploaded ? C.success + "12" : isReady ? "#F5C84218" : accentColor + "14";
+  const bgTo   = uploaded ? C.success + "06" : isReady ? "#F5C84208" : accentColor + "06";
+
   return (
-    <TouchableOpacity
-      onPress={onPress} activeOpacity={0.8} disabled={loading}
-      style={[uStyles.zone, { borderColor: uploaded ? C.success + "66" : accentColor + "55", borderStyle: uploaded ? "solid" : "dashed" }]}
-    >
-      <LinearGradient
-        colors={uploaded ? [C.success + "12", C.success + "06"] : [accentColor + "14", accentColor + "06"]}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={uStyles.row}>
-        {loading ? (
-          <View style={[uStyles.iconBox, { backgroundColor: accentColor + "22" }]}>
-            <ActivityIndicator size="small" color={accentColor} />
-          </View>
-        ) : uploaded ? (
-          <View style={[uStyles.iconBox, { backgroundColor: C.success + "22" }]}>
-            <Feather name="check-circle" size={18} color={C.success} />
-          </View>
-        ) : (
-          <View style={[uStyles.iconBox, { backgroundColor: accentColor + "22" }]}>
-            <Feather name="upload-cloud" size={18} color={accentColor} />
-          </View>
-        )}
-        <Text style={[uStyles.label, { color: uploaded ? C.text : C.textSecondary }]} numberOfLines={1}>
-          {loading ? "Parsing document…" : uploaded ? fileName : label}
-        </Text>
-        {uploaded && onClear && (
-          <TouchableOpacity onPress={onClear} hitSlop={10}>
-            <Feather name="x" size={16} color={C.textSecondary} />
-          </TouchableOpacity>
-        )}
-        {!uploaded && !loading && <Feather name="chevron-right" size={16} color={accentColor} />}
-      </View>
-    </TouchableOpacity>
+    <View style={uStyles.wrapper}>
+      {/* File selector row */}
+      <TouchableOpacity
+        onPress={onPress} activeOpacity={0.8} disabled={loading || uploaded}
+        style={[uStyles.zone, { borderColor, borderStyle }]}
+      >
+        <LinearGradient colors={[bgFrom, bgTo]} style={StyleSheet.absoluteFill} />
+        <View style={uStyles.row}>
+          {loading ? (
+            <View style={[uStyles.iconBox, { backgroundColor: accentColor + "22" }]}>
+              <ActivityIndicator size="small" color={accentColor} />
+            </View>
+          ) : uploaded ? (
+            <View style={[uStyles.iconBox, { backgroundColor: C.success + "22" }]}>
+              <Feather name="check-circle" size={18} color={C.success} />
+            </View>
+          ) : isReady ? (
+            <View style={[uStyles.iconBox, { backgroundColor: "#F5C84222" }]}>
+              <Feather name="file-text" size={18} color="#F5C842" />
+            </View>
+          ) : (
+            <View style={[uStyles.iconBox, { backgroundColor: accentColor + "22" }]}>
+              <Feather name="upload-cloud" size={18} color={accentColor} />
+            </View>
+          )}
+          <Text
+            style={[uStyles.label, { color: uploaded ? C.text : isReady ? "#F5C842" : C.textSecondary }]}
+            numberOfLines={1}
+          >
+            {loading
+              ? "Parsing document…"
+              : uploaded
+              ? fileName
+              : isReady
+              ? fileName
+              : label}
+          </Text>
+          {(uploaded || isReady) && onClear && (
+            <TouchableOpacity onPress={onClear} hitSlop={10}>
+              <Feather name="x" size={16} color={C.textSecondary} />
+            </TouchableOpacity>
+          )}
+          {!uploaded && !loading && !isReady && (
+            <Feather name="chevron-right" size={16} color={accentColor} />
+          )}
+        </View>
+      </TouchableOpacity>
+
+      {/* ── START PARSING button — appears only after file is selected ── */}
+      {isReady && onParse && (
+        <TouchableOpacity onPress={onParse} activeOpacity={0.85} style={uStyles.parseBtn}>
+          <LinearGradient
+            colors={["#F5C842", "#D4A000"]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={uStyles.parseBtnGrad}
+          >
+            <Feather name="zap" size={16} color="#000" />
+            <Text style={uStyles.parseBtnText}>Start Parsing</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
+
+      {/* Uploaded confirmation chip */}
+      {uploaded && (
+        <View style={uStyles.doneChip}>
+          <Feather name="check-circle" size={12} color={C.success} />
+          <Text style={uStyles.doneText}>Values extracted successfully</Text>
+        </View>
+      )}
+    </View>
   );
 }
 
 const uStyles = StyleSheet.create({
+  wrapper: { gap: 8 },
   zone: { borderRadius: 16, borderWidth: 1.5, overflow: "hidden", paddingHorizontal: 16, paddingVertical: 14 },
   row: { flexDirection: "row", alignItems: "center", gap: 12 },
   iconBox: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   label: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium" },
+  parseBtn: { borderRadius: 14, overflow: "hidden" },
+  parseBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, paddingHorizontal: 20 },
+  parseBtnText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#000" },
+  doneChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#10B98115", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  doneText: { fontSize: 11, color: "#10B981", fontFamily: "Inter_500Medium" },
 });
 
 // ── Gradient button ────────────────────────────────────────────────────────────

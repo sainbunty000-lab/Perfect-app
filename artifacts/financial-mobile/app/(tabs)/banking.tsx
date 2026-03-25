@@ -47,12 +47,13 @@ export default function BankingScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const createCase = useCreateCase();
 
-  const [data, setData] = useState<BankingData>({});
-  const [results, setResults] = useState<BankingResults | null>(null);
-  const [parsing, setParsing] = useState(false);
+  const [data, setData]           = useState<BankingData>({});
+  const [results, setResults]     = useState<BankingResults | null>(null);
+  const [parsing, setParsing]     = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [saving, setSaving]     = useState(false);
-  const [slot, setSlot]         = useState<SlotInfo>(null);
+  const [saving, setSaving]       = useState(false);
+  const [asset, setAsset]         = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [slot, setSlotState]      = useState<SlotInfo>(null);
   const [saveModal, setSaveModal] = useState(false);
   const [clientName, setClientName] = useState("");
   const [showInputs, setShowInputs] = useState(false);
@@ -62,19 +63,26 @@ export default function BankingScreen() {
     setData((d) => ({ ...d, [key]: num }));
   };
 
-  const handlePickFile = async () => {
+  // Step 1: pick the file only
+  const handleSelectFile = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["*/*"], copyToCacheDirectory: true, multiple: false,
-      });
+      const result = await DocumentPicker.getDocumentAsync({ type: ["*/*"], copyToCacheDirectory: true, multiple: false });
       if (result.canceled) return;
-      const asset = result.assets[0];
-      setParsing(true);
+      setAsset(result.assets[0]);
+      setSlotState(null);
+      setResults(null);
+    } catch {
+      Alert.alert("Error", "Could not open file picker.");
+    }
+  };
 
-      // Server-side structured extraction — no guesswork on the device
+  // Step 2: send to server for parsing
+  const handleParseFile = async () => {
+    if (!asset) return;
+    setParsing(true);
+    try {
       const parsed = await parseFinancialDocument(asset.uri, asset.name, asset.mimeType ?? undefined, "banking");
       const f = parsed.fields as any;
-
       setData((d) => ({
         ...d,
         ...(f.totalCredits         !== undefined && { totalCredits:         f.totalCredits }),
@@ -90,13 +98,7 @@ export default function BankingScreen() {
         ...(f.ecsEmiPayments       !== undefined && { ecsEmiPayments:       f.ecsEmiPayments }),
         ...(f.transactionFrequency !== undefined && { transactionFrequency: f.transactionFrequency }),
       }));
-
-      setSlot({
-        name:     asset.name,
-        format:   FORMAT_LABEL[parsed.format],
-        bankName: f.bankName,
-        period:   f.statementPeriod,
-      });
+      setSlotState({ name: asset.name, format: FORMAT_LABEL[parsed.format], bankName: f.bankName, period: f.statementPeriod });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: any) {
       Alert.alert("Parse Failed", e?.message ?? "Could not read the file. Try a CSV or PDF statement.");
@@ -161,13 +163,15 @@ export default function BankingScreen() {
             </Text>
 
             <UploadZone
-              onPress={handlePickFile}
+              onPress={handleSelectFile}
               loading={parsing}
               uploaded={!!slot}
-              fileName={slot?.name}
-              label="Upload Bank Statement"
+              fileSelected={!!asset && !slot}
+              fileName={asset?.name ?? slot?.name}
+              label="Select Bank Statement (PDF / Excel / CSV)"
               accentColor={C.accent}
-              onClear={() => { setSlot(null); setData({}); setResults(null); }}
+              onParse={handleParseFile}
+              onClear={() => { setAsset(null); setSlotState(null); setData({}); setResults(null); }}
             />
 
             {/* Detected metadata */}

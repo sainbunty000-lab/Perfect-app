@@ -46,14 +46,16 @@ export default function WorkingCapitalScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const createCase = useCreateCase();
 
-  const [data, setData]         = useState<WorkingCapitalData>({});
-  const [results, setResults]   = useState<WorkingCapitalResults | null>(null);
+  const [data, setData]           = useState<WorkingCapitalData>({});
+  const [results, setResults]     = useState<WorkingCapitalResults | null>(null);
   const [bsParsing, setBsParsing] = useState(false);
   const [plParsing, setPlParsing] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [saving, setSaving]     = useState(false);
-  const [bsSlot, setBsSlot]     = useState<UploadSlot>(null);
-  const [plSlot, setPlSlot]     = useState<UploadSlot>(null);
+  const [saving, setSaving]       = useState(false);
+  const [bsAsset, setBsAsset]     = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [plAsset, setPlAsset]     = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [bsSlot, setBsSlot]       = useState<UploadSlot>(null);
+  const [plSlot, setPlSlot]       = useState<UploadSlot>(null);
   const [saveModal, setSaveModal] = useState(false);
   const [clientName, setClientName] = useState("");
   const [showInputs, setShowInputs] = useState(false);
@@ -63,41 +65,48 @@ export default function WorkingCapitalScreen() {
     setData((d) => ({ ...d, [key]: num }));
   };
 
-  const pickAndParse = async (section: "bs" | "pl") => {
-    const setParsing = section === "bs" ? setBsParsing : setPlParsing;
-    const setSlot    = section === "bs" ? setBsSlot    : setPlSlot;
-    const bsKeys: (keyof WorkingCapitalData)[] = ["currentAssets","currentLiabilities","inventory","debtors","creditors","cash"];
-    const plKeys: (keyof WorkingCapitalData)[] = ["sales","cogs","purchases","expenses","netProfit"];
-    const relevantKeys = section === "bs" ? bsKeys : plKeys;
-
+  // Step 1: just pick the file — no parsing yet
+  const selectFile = async (section: "bs" | "pl") => {
     try {
       const result = await DocumentPicker.getDocumentAsync({ type: ["*/*"], copyToCacheDirectory: true, multiple: false });
       if (result.canceled) return;
-      const asset = result.assets[0];
-      setParsing(true);
-      let merged: Partial<WorkingCapitalData> = {};
-      try {
-        const docType = section === "bs" ? "balance_sheet" : "profit_loss";
-        const parsed = await parseFinancialDocument(asset.uri, asset.name, asset.mimeType ?? undefined, docType);
-        const fields = parsed.fields as any;
-        for (const key of relevantKeys) {
-          if (fields[key] !== undefined) merged[key] = fields[key];
-        }
-        setSlot({ name: asset.name, format: FORMAT_LABEL[parsed.format] });
-      } catch {
-        Alert.alert("Parse Error", "Could not read the file. Enter values manually.");
-        setParsing(false);
-        return;
+      if (section === "bs") { setBsAsset(result.assets[0]); setBsSlot(null); }
+      else                  { setPlAsset(result.assets[0]); setPlSlot(null); }
+      setResults(null);
+    } catch {
+      Alert.alert("Error", "Could not open file picker.");
+    }
+  };
+
+  // Step 2: send to server for parsing
+  const doParse = async (section: "bs" | "pl") => {
+    const asset        = section === "bs" ? bsAsset : plAsset;
+    const setParsing   = section === "bs" ? setBsParsing : setPlParsing;
+    const setSlot      = section === "bs" ? setBsSlot    : setPlSlot;
+    const bsKeys: (keyof WorkingCapitalData)[] = ["currentAssets","currentLiabilities","inventory","debtors","creditors","cash"];
+    const plKeys: (keyof WorkingCapitalData)[] = ["sales","cogs","purchases","expenses","netProfit"];
+    const relevantKeys = section === "bs" ? bsKeys : plKeys;
+    if (!asset) return;
+
+    setParsing(true);
+    try {
+      const docType = section === "bs" ? "balance_sheet" : "profit_loss";
+      const parsed  = await parseFinancialDocument(asset.uri, asset.name, asset.mimeType ?? undefined, docType);
+      const fields  = parsed.fields as any;
+      const merged: Partial<WorkingCapitalData> = {};
+      for (const key of relevantKeys) {
+        if (fields[key] !== undefined) merged[key] = fields[key];
       }
+      setSlot({ name: asset.name, format: FORMAT_LABEL[parsed.format] });
       if (Object.keys(merged).length > 0) {
         setData((d) => ({ ...d, ...merged }));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
-        Alert.alert("No Data Found", "Could not extract values. You can enter them manually below.");
+        Alert.alert("No Data Found", "Values could not be extracted. Enter them manually below.");
         setShowInputs(true);
       }
     } catch {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Parse Error", "Could not read the file. Enter values manually.");
     } finally {
       setParsing(false);
     }
@@ -149,23 +158,27 @@ export default function WorkingCapitalScreen() {
           {/* ── Step 1: Upload Documents ──────────────────────────── */}
           <StepCard step={1} title="Upload Documents" subtitle="Select your financial documents — values are auto-extracted">
             <UploadZone
-              onPress={() => pickAndParse("bs")}
+              onPress={() => selectFile("bs")}
               loading={bsParsing}
               uploaded={!!bsSlot}
-              fileName={bsSlot?.name}
-              label="Balance Sheet (PDF / Excel / Image)"
+              fileSelected={!!bsAsset && !bsSlot}
+              fileName={bsAsset?.name ?? bsSlot?.name}
+              label="Select Balance Sheet (PDF / Excel / Image)"
               accentColor={C.secondary}
-              onClear={() => { setBsSlot(null); setData((d) => ({ ...d, currentAssets: undefined, currentLiabilities: undefined, inventory: undefined, debtors: undefined, creditors: undefined, cash: undefined })); setResults(null); }}
+              onParse={() => doParse("bs")}
+              onClear={() => { setBsAsset(null); setBsSlot(null); setData((d) => ({ ...d, currentAssets: undefined, currentLiabilities: undefined, inventory: undefined, debtors: undefined, creditors: undefined, cash: undefined })); setResults(null); }}
             />
             <View style={styles.uploadGap} />
             <UploadZone
-              onPress={() => pickAndParse("pl")}
+              onPress={() => selectFile("pl")}
               loading={plParsing}
               uploaded={!!plSlot}
-              fileName={plSlot?.name}
-              label="P&L Statement (PDF / Excel / Image)"
+              fileSelected={!!plAsset && !plSlot}
+              fileName={plAsset?.name ?? plSlot?.name}
+              label="Select P&L Statement (PDF / Excel / Image)"
               accentColor={C.primary}
-              onClear={() => { setPlSlot(null); setData((d) => ({ ...d, sales: undefined, cogs: undefined, purchases: undefined, expenses: undefined, netProfit: undefined })); setResults(null); }}
+              onParse={() => doParse("pl")}
+              onClear={() => { setPlAsset(null); setPlSlot(null); setData((d) => ({ ...d, sales: undefined, cogs: undefined, purchases: undefined, expenses: undefined, netProfit: undefined })); setResults(null); }}
             />
             {(bsSlot || plSlot) && (
               <View style={styles.parsedChip}>

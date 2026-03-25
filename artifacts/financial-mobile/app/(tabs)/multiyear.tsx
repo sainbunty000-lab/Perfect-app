@@ -41,7 +41,9 @@ interface YearData {
 
 interface YearSlot {
   data: YearData;
+  bsRawAsset?: DocumentPicker.DocumentPickerAsset;
   bsFile?: string; bsFormat?: string; bsParsing?: boolean;
+  plRawAsset?: DocumentPicker.DocumentPickerAsset;
   plFile?: string; plFormat?: string; plParsing?: boolean;
 }
 
@@ -90,18 +92,35 @@ export default function MultiYearScreen() {
   const setSlot = (i: number, patch: Partial<YearSlot>) =>
     setSlots((prev) => prev.map((s, j) => j === i ? { ...s, ...patch } : s));
 
-  const pickBS = async (i: number) => {
+  // Step 1: select file (no parsing yet)
+  const selectBS = async (i: number) => {
     try {
       const res = await DocumentPicker.getDocumentAsync({ type: ["*/*"], copyToCacheDirectory: true, multiple: false });
       if (res.canceled) return;
-      const asset = res.assets[0];
-      setSlot(i, { bsParsing: true });
-      const parsed = await parseFinancialDocument(asset.uri, asset.name, asset.mimeType ?? undefined, "balance_sheet");
+      setSlot(i, { bsRawAsset: res.assets[0], bsFile: undefined });
+      setAnalyzed(false);
+    } catch { Alert.alert("Error", "Could not open file picker."); }
+  };
+
+  const selectPL = async (i: number) => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({ type: ["*/*"], copyToCacheDirectory: true, multiple: false });
+      if (res.canceled) return;
+      setSlot(i, { plRawAsset: res.assets[0], plFile: undefined });
+      setAnalyzed(false);
+    } catch { Alert.alert("Error", "Could not open file picker."); }
+  };
+
+  // Step 2: parse the selected file
+  const parseBS = async (i: number) => {
+    const raw = slots[i].bsRawAsset;
+    if (!raw) return;
+    setSlot(i, { bsParsing: true });
+    try {
+      const parsed = await parseFinancialDocument(raw.uri, raw.name, raw.mimeType ?? undefined, "balance_sheet");
       const f = parsed.fields as any;
       setSlot(i, {
-        bsParsing: false,
-        bsFile:    asset.name,
-        bsFormat:  FORMAT_LABEL[parsed.format],
+        bsParsing: false, bsFile: raw.name, bsFormat: FORMAT_LABEL[parsed.format],
         data: {
           ...slots[i].data,
           ...(f.currentAssets      !== undefined && { currentAssets:      f.currentAssets }),
@@ -122,18 +141,15 @@ export default function MultiYearScreen() {
     }
   };
 
-  const pickPL = async (i: number) => {
+  const parsePL = async (i: number) => {
+    const raw = slots[i].plRawAsset;
+    if (!raw) return;
+    setSlot(i, { plParsing: true });
     try {
-      const res = await DocumentPicker.getDocumentAsync({ type: ["*/*"], copyToCacheDirectory: true, multiple: false });
-      if (res.canceled) return;
-      const asset = res.assets[0];
-      setSlot(i, { plParsing: true });
-      const parsed = await parseFinancialDocument(asset.uri, asset.name, asset.mimeType ?? undefined, "profit_loss");
+      const parsed = await parseFinancialDocument(raw.uri, raw.name, raw.mimeType ?? undefined, "profit_loss");
       const f = parsed.fields as any;
       setSlot(i, {
-        plParsing: false,
-        plFile:    asset.name,
-        plFormat:  FORMAT_LABEL[parsed.format],
+        plParsing: false, plFile: raw.name, plFormat: FORMAT_LABEL[parsed.format],
         data: {
           ...slots[i].data,
           ...(f.sales       !== undefined && { sales:       f.sales }),
@@ -236,15 +252,17 @@ export default function MultiYearScreen() {
                   <Feather name="layers" size={11} color={GREEN} /> {"  "}Balance Sheet
                 </Text>
                 <UploadZone
-                  onPress={() => pickBS(i)}
+                  onPress={() => selectBS(i)}
                   loading={slot.bsParsing}
                   uploaded={!!slot.bsFile}
-                  fileName={slot.bsFile}
-                  label="Upload Balance Sheet (PDF / Excel / Image)"
+                  fileSelected={!!slot.bsRawAsset && !slot.bsFile}
+                  fileName={slot.bsRawAsset?.name ?? slot.bsFile}
+                  label="Select Balance Sheet (PDF / Excel / Image)"
                   accentColor={GREEN}
+                  onParse={() => parseBS(i)}
                   onClear={() => {
                     setSlot(i, {
-                      bsFile: undefined, bsFormat: undefined,
+                      bsRawAsset: undefined, bsFile: undefined, bsFormat: undefined,
                       data: { ...slot.data, currentAssets: undefined, currentLiabilities: undefined, inventory: undefined, debtors: undefined, creditors: undefined, cash: undefined },
                     });
                     setAnalyzed(false);
@@ -264,15 +282,17 @@ export default function MultiYearScreen() {
                   <Feather name="trending-up" size={11} color={TEAL} /> {"  "}Profit & Loss
                 </Text>
                 <UploadZone
-                  onPress={() => pickPL(i)}
+                  onPress={() => selectPL(i)}
                   loading={slot.plParsing}
                   uploaded={!!slot.plFile}
-                  fileName={slot.plFile}
-                  label="Upload P&L Statement (PDF / Excel / Image)"
+                  fileSelected={!!slot.plRawAsset && !slot.plFile}
+                  fileName={slot.plRawAsset?.name ?? slot.plFile}
+                  label="Select P&L Statement (PDF / Excel / Image)"
                   accentColor={TEAL}
+                  onParse={() => parsePL(i)}
                   onClear={() => {
                     setSlot(i, {
-                      plFile: undefined, plFormat: undefined,
+                      plRawAsset: undefined, plFile: undefined, plFormat: undefined,
                       data: { ...slot.data, sales: undefined, grossProfit: undefined, netProfit: undefined, expenses: undefined },
                     });
                     setAnalyzed(false);
