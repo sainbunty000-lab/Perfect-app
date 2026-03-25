@@ -1,8 +1,9 @@
 /**
  * Sends documents to the API server for server-side text extraction + structured parsing.
- * The /api/parse-financial endpoint returns fully structured financial fields
- * so the mobile app never has to do regex work itself — 100% server-side accuracy.
+ * Handles both web (blob: URLs) and native (file: URIs) correctly.
  */
+
+import { Platform } from "react-native";
 
 function getApiBase(): string {
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
@@ -25,7 +26,7 @@ export interface FinancialParseResult<T = Record<string, unknown>> extends Parse
 function detectLocalFormat(name: string, mimeType?: string): ParseFormat {
   const lower = name.toLowerCase();
   if (lower.endsWith(".pdf") || mimeType === "application/pdf") return "pdf";
-  if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) return "excel";
+  if (lower.endsWith(".xlsx") || lower.endsWith(".xls") || lower.endsWith(".csv")) return "excel";
   if (
     lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") ||
     lower.endsWith(".webp") || lower.endsWith(".tiff") || (mimeType?.startsWith("image/") ?? false)
@@ -33,10 +34,77 @@ function detectLocalFormat(name: string, mimeType?: string): ParseFormat {
   return "text";
 }
 
-function getMimeType(fmt: ParseFormat): string {
-  if (fmt === "pdf") return "application/pdf";
-  if (fmt === "excel") return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  return "image/jpeg";
+function getMimeType(name: string, mimeType?: string): string {
+  if (mimeType && mimeType !== "application/octet-stream") return mimeType;
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".pdf")) return "application/pdf";
+  if (lower.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  if (lower.endsWith(".xls")) return "application/vnd.ms-excel";
+  if (lower.endsWith(".csv")) return "text/csv";
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".tiff")) return "image/tiff";
+  return "application/octet-stream";
+}
+
+/**
+ * Appends the file to FormData correctly for both web and native platforms.
+ *
+ * - Web:    uri is a blob: URL → fetch it → get real Blob → append Blob
+ * - Native: uri is a file:// path → use {uri,name,type} object (RN FormData trick)
+ */
+async function appendFileToForm(
+  formData: FormData,
+  uri: string,
+  name: string,
+  mimeType: string,
+): Promise<void> {
+  if (Platform.OS === "web") {
+    // On web the URI is a blob: or data: URL — fetch the actual bytes
+    const response = await fetch(uri);
+    if (!response.ok) throw new Error("Could not read the selected file.");
+    const blob = await response.blob();
+    formData.append("file", blob, name);
+  } else {
+    // React Native native — the {uri,name,type} object is special FormData magic
+    formData.append("file", { uri, name, type: mimeType } as unknown as Blob);
+  }
+}
+
+/**
+ * Parse a financial document and return structured fields + raw text.
+ */
+export async function parseFinancialDocument<T = Record<string, unknown>>(
+  uri: string,
+  name: string,
+  mimeType: string | undefined,
+  docType: DocType,
+): Promise<FinancialParseResult<T>> {
+  const resolvedMime = getMimeType(name, mimeType);
+  const fmt          = detectLocalFormat(name, resolvedMime);
+  const base         = getApiBase();
+
+  const formData = new FormData();
+  await appendFileToForm(formData, uri, name, resolvedMime);
+  formData.append("docType", docType);
+
+  const resp = await fetch(`${base}/api/parse-financial`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error((err as any).message ?? `Server error ${resp.status}`);
+  }
+
+  const data = await resp.json();
+  return {
+    text:   data.text   ?? "",
+    format: (data.format as ParseFormat) ?? fmt,
+    fields: (data.fields ?? {}) as T,
+  };
 }
 
 /** Raw text extraction — used when you just need the text, not structured fields */
@@ -47,9 +115,11 @@ export async function parseFileViaApi(uri: string, name: string, mimeType?: stri
     const text = await response.text();
     return { text, format: "text" };
   }
+  const resolvedMime = getMimeType(name, mimeType);
   const base = getApiBase();
   const formData = new FormData();
-  formData.append("file", { uri, name, type: mimeType ?? getMimeType(fmt) } as unknown as Blob);
+  await appendFileToForm(formData, uri, name, resolvedMime);
+
   const resp = await fetch(`${base}/api/parse-document`, { method: "POST", body: formData });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
@@ -59,46 +129,9 @@ export async function parseFileViaApi(uri: string, name: string, mimeType?: stri
   return { text: data.text ?? "", format: (data.format as ParseFormat) ?? fmt };
 }
 
-/**
- * Parse a financial document and return structured fields + raw text.
- * The server runs the full position-aware parser — same quality as the web app.
- *
- * @param uri     Local file URI from DocumentPicker
- * @param name    File name (used for format detection)
- * @param mimeType  MIME type (optional)
- * @param docType   What kind of document: balance_sheet | profit_loss | banking | gstr | itr
- */
-export async function parseFinancialDocument<T = Record<string, unknown>>(
-  uri: string,
-  name: string,
-  mimeType: string | undefined,
-  docType: DocType,
-): Promise<FinancialParseResult<T>> {
-  const fmt = detectLocalFormat(name, mimeType);
-
-  // Plain text / CSV — send to server for structured parsing too (banking CSV)
-  const base = getApiBase();
-  const formData = new FormData();
-  formData.append("file", { uri, name, type: mimeType ?? getMimeType(fmt) } as unknown as Blob);
-  formData.append("docType", docType);
-
-  const resp = await fetch(`${base}/api/parse-financial`, { method: "POST", body: formData });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error((err as any).message ?? "Financial parse failed");
-  }
-
-  const data = await resp.json();
-  return {
-    text:   data.text ?? "",
-    format: (data.format as ParseFormat) ?? fmt,
-    fields: (data.fields ?? {}) as T,
-  };
-}
-
 export const FORMAT_LABEL: Record<ParseFormat, string> = {
   pdf:     "PDF Document",
-  excel:   "Excel Spreadsheet",
+  excel:   "Excel / CSV",
   image:   "Scanned Image (OCR)",
   text:    "Text / CSV",
   unknown: "Unknown",
