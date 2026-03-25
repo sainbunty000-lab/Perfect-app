@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Dhanush Financial Analyzer"
+version = "1.0.0"
+id = "artifacts/financial-analyzer"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25884
+
+[services.development]
+run = "pnpm --filter @workspace/financial-analyzer run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/financial-analyzer", "run", "build" ]
+publicDir = "artifacts/financial-analyzer/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25884"
+BASE_PATH = "/"

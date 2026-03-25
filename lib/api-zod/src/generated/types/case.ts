@@ -5,7 +5,10 @@
  * Dhanush Financial Analyzer API
  * OpenAPI spec version: 0.1.0
  */
+import type { CaseInput } from "./caseInput";
 
-export interface HealthStatus {
-  status: string;
-}
+export type Case = CaseInput & {
+  id: number;
+  createdAt: string;
+  updatedAt: string;
+};
