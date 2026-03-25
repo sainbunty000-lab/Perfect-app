@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "./pages/dashboard";
 import WorkingCapital from "./pages/working-capital";
 import BankingAnalysis from "./pages/banking-analysis";
+import GstItr from "./pages/gst-itr";
 import Storage from "./pages/storage";
 import NotFound from "@/pages/not-found";
 
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/working-capital" component={WorkingCapital} />
       <Route path="/banking-analysis" component={BankingAnalysis} />
+      <Route path="/gst-itr" component={GstItr} />
       <Route path="/storage" component={Storage} />
       <Route component={NotFound} />
     </Switch>

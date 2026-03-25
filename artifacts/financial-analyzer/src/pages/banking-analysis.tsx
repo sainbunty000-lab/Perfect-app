@@ -6,7 +6,8 @@ import { calculateBanking } from "@/lib/calculations";
 import type { BankingData } from "@/lib/parser";
 import type { BankingResults } from "@/lib/calculations";
 import { exportToPDF } from "@/lib/pdf";
-import { UploadCloud, FileSpreadsheet, Calculator, Download, Save, Activity, CheckCircle, AlertOctagon } from "lucide-react";
+import { UploadCloud, FileSpreadsheet, Calculator, Download, Save, Activity, CheckCircle, AlertOctagon, Loader2, X, FileText, FileImage } from "lucide-react";
+import { ACCEPTED_EXTENSIONS, detectFormat, FORMAT_LABELS } from "@/lib/fileReader";
 import { useCreateCase } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,13 +28,15 @@ export default function BankingAnalysis() {
     }
   });
 
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; label: string; fieldsExtracted: number } | null>(null);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
 
     setIsParsing(true);
     try {
-      const extracted = await parseBankFile(files[0]);
+      const extracted = await parseBankFile(file);
 
       let fieldsFound = 0;
       (Object.keys(extracted) as (keyof BankingData)[]).forEach((key) => {
@@ -43,13 +46,11 @@ export default function BankingAnalysis() {
         }
       });
 
-      toast({
-        title: "Statement Parsed",
-        description: `Extracted ${fieldsFound} banking metrics. Please verify the values before calculating.`,
-      });
+      setUploadedFile({ name: file.name, label: FORMAT_LABELS[detectFormat(file)], fieldsExtracted: fieldsFound });
+      toast({ title: "Statement Parsed", description: `Extracted ${fieldsFound} banking metrics. Please verify before calculating.` });
       handleCalculate();
     } catch (err) {
-      toast({ title: "Parsing Failed", description: "Could not read the bank statement. Ensure it's a valid CSV.", variant: "destructive" });
+      toast({ title: "Parsing Failed", description: "Could not read the bank statement. Try CSV or PDF format.", variant: "destructive" });
     } finally {
       setIsParsing(false);
     }
@@ -114,11 +115,39 @@ export default function BankingAnalysis() {
             <h3 className="text-lg font-display font-semibold mb-4 flex items-center gap-2">
               <UploadCloud className="w-5 h-5 text-secondary" /> Bank Statement CSV
             </h3>
-            <div className="relative group cursor-pointer border-2 border-dashed border-border hover:border-secondary/50 rounded-xl p-8 text-center transition-colors bg-background/50">
-              <input type="file" accept=".csv" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-              <FileSpreadsheet className="w-8 h-8 mx-auto text-muted-foreground group-hover:text-secondary transition-colors mb-3" />
-              <p className="text-sm font-medium">Upload Statement</p>
-            </div>
+            {uploadedFile ? (
+              <div className="rounded-xl border border-success/30 bg-success/5 px-4 py-3 flex items-center gap-3">
+                <FileSpreadsheet className="w-5 h-5 text-green-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{uploadedFile.name}</p>
+                  <p className="text-xs text-muted-foreground">{uploadedFile.label} · {uploadedFile.fieldsExtracted} metric(s) extracted</p>
+                </div>
+                <CheckCircle className="w-5 h-5 text-success shrink-0" />
+                <button onClick={() => setUploadedFile(null)} className="p-1 hover:bg-white/10 rounded text-muted-foreground">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative group cursor-pointer border-2 border-dashed border-border hover:border-secondary/50 rounded-xl p-6 text-center transition-colors bg-background/40">
+                <input type="file" accept={ACCEPTED_EXTENSIONS} onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                {isParsing ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="w-7 h-7 text-secondary animate-spin" />
+                    <p className="text-sm font-medium">Parsing statement…</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
+                    <UploadCloud className="w-7 h-7 text-secondary group-hover:scale-110 transition-transform" />
+                    <p className="text-sm font-medium">Click or drag & drop</p>
+                    <div className="flex flex-wrap justify-center gap-1 mt-1">
+                      {["CSV", "PDF", "Excel", "Image"].map((f) => (
+                        <span key={f} className="text-[10px] bg-white/5 border border-border/50 px-2 py-0.5 rounded-full text-muted-foreground">{f}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="glass-card p-6 rounded-2xl border border-border/50 h-[500px] overflow-y-auto">

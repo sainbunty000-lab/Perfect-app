@@ -1,11 +1,12 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, BarChart2, Landmark, FolderOpen, ShieldAlert, LogOut } from "lucide-react";
+import { LayoutDashboard, BarChart2, Landmark, FolderOpen, ShieldAlert, LogOut, Receipt } from "lucide-react";
 import { motion } from "framer-motion";
 
 const NAV_ITEMS = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard, iconColor: "text-primary" },
   { path: "/working-capital", label: "Working Capital", icon: BarChart2, iconColor: "text-[#4A9EFF]" },
   { path: "/banking-analysis", label: "Banking Analysis", icon: Landmark, iconColor: "text-[#F5C842]" },
+  { path: "/gst-itr", label: "GST & ITR", icon: Receipt, iconColor: "text-[#A855F7]" },
   { path: "/storage", label: "Saved CAM Files", icon: FolderOpen, iconColor: "text-[#F5832A]" },
 ];
 

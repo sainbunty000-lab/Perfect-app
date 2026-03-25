@@ -768,7 +768,9 @@ export async function parseBankFile(file: File): Promise<Partial<BankingData>> {
     return parseBankingCsv(file);
   }
 
-  const text = await file.text();
+  // For PDF, Excel, Image — extract text first via fileReader
+  const { extractTextFromFile } = await import("./fileReader");
+  const text = await extractTextFromFile(file);
 
   // Detect CSV-like structure: header row with commas
   const firstFewLines = text.split("\n").slice(0, 5).join("\n");
@@ -792,8 +794,15 @@ export async function parseBankFile(file: File): Promise<Partial<BankingData>> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Auto-detect and parse Balance Sheet / P&L
+// Supports: PDF, Excel, JPEG/PNG (OCR), TXT, CSV
 // ─────────────────────────────────────────────────────────────────────────────
 export async function parseFinancialFile(file: File): Promise<WorkingCapitalData> {
-  const text = await file.text();
+  const { extractTextFromFile } = await import("./fileReader");
+  const text = await extractTextFromFile(file);
+  return extractWorkingCapitalFromText(text);
+}
+
+// Parse text directly (used when caller already extracted text)
+export function parseFinancialText(text: string): WorkingCapitalData {
   return extractWorkingCapitalFromText(text);
 }

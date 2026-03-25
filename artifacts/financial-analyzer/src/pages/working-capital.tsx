@@ -1,81 +1,112 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Layout } from "@/components/Layout";
 import { parseFinancialFile } from "@/lib/parser";
-import { calculateWorkingCapital, getRatioStatus } from "@/lib/calculations";
+import { extractWorkingCapitalFromText } from "@/lib/parser";
+import { calculateWorkingCapital } from "@/lib/calculations";
 import type { WorkingCapitalData } from "@/lib/parser";
 import type { WorkingCapitalResults } from "@/lib/calculations";
 import { exportToPDF } from "@/lib/pdf";
-import { UploadCloud, FileText, Calculator, Download, Save, Info, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
+import { ACCEPTED_EXTENSIONS, detectFormat, FORMAT_LABELS } from "@/lib/fileReader";
+import {
+  UploadCloud, FileText, Calculator, Download, Save, Info,
+  CheckCircle, AlertTriangle, XCircle, FileImage, FileSpreadsheet,
+  Loader2, X, ChevronDown, ChevronUp,
+} from "lucide-react";
 import { useCreateCase } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
+type UploadedFile = { file: File; label: string; fieldsExtracted: number };
+
+const formatIcon = (fmt: string) => {
+  if (fmt === "pdf") return <FileText className="w-5 h-5 text-red-400" />;
+  if (fmt === "excel") return <FileSpreadsheet className="w-5 h-5 text-green-400" />;
+  if (fmt === "image") return <FileImage className="w-5 h-5 text-blue-400" />;
+  return <FileText className="w-5 h-5 text-muted-foreground" />;
+};
+
 export default function WorkingCapital() {
   const { toast } = useToast();
-  const [isParsing, setIsParsing] = useState(false);
+  const [parsingBS, setParsingBS] = useState(false);
+  const [parsingPL, setParsingPL] = useState(false);
+  const [bsFile, setBsFile] = useState<UploadedFile | null>(null);
+  const [plFile, setPlFile] = useState<UploadedFile | null>(null);
   const [results, setResults] = useState<WorkingCapitalResults | null>(null);
-  
+  const [showManual, setShowManual] = useState(false);
+  const bsInputRef = useRef<HTMLInputElement>(null);
+  const plInputRef = useRef<HTMLInputElement>(null);
+
   const createCase = useCreateCase();
 
-  const { register, handleSubmit, setValue, watch, getValues } = useForm<WorkingCapitalData>({
+  const { register, setValue, watch, getValues } = useForm<WorkingCapitalData>({
     defaultValues: {
-      currentAssets: 0, currentLiabilities: 0, inventory: 0, 
-      debtors: 0, creditors: 0, cash: 0, sales: 0, cogs: 0, 
-      purchases: 0, expenses: 0, netProfit: 0
-    }
+      currentAssets: 0, currentLiabilities: 0, inventory: 0,
+      debtors: 0, creditors: 0, cash: 0, sales: 0, cogs: 0,
+      purchases: 0, expenses: 0, netProfit: 0,
+    },
   });
 
   const formValues = watch();
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setIsParsing(true);
-    try {
-      const file = files[0];
-      const extracted = await parseFinancialFile(file);
-
-      let fieldsFound = 0;
-      (Object.keys(extracted) as (keyof WorkingCapitalData)[]).forEach((key) => {
-        if (extracted[key] !== undefined) {
-          setValue(key, extracted[key] as number);
-          fieldsFound++;
-        }
-      });
-
-      if (fieldsFound === 0) {
-        toast({
-          title: "No Data Extracted",
-          description: "Could not find recognizable financial fields. Please check the file format or use manual input.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Parsing Complete",
-          description: `Successfully extracted ${fieldsFound} field(s) from document. Please verify values below.`,
-        });
-        handleCalculate();
+  const mergeExtracted = (data: WorkingCapitalData) => {
+    (Object.keys(data) as (keyof WorkingCapitalData)[]).forEach((key) => {
+      if (data[key] !== undefined && data[key] !== 0) {
+        setValue(key, data[key] as number);
       }
-    } catch (err) {
-      toast({
-        title: "Parsing Failed",
-        description: "Could not read the document. Supported: .txt, .csv",
-        variant: "destructive",
-      });
+    });
+  };
+
+  const handleBSUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setParsingBS(true);
+    try {
+      const extracted = await parseFinancialFile(file);
+      const bsFields: (keyof WorkingCapitalData)[] = [
+        "currentAssets", "currentLiabilities", "inventory",
+        "debtors", "creditors", "cash",
+      ];
+      let count = 0;
+      bsFields.forEach((k) => { if (extracted[k] !== undefined) { setValue(k, extracted[k] as number); count++; } });
+      mergeExtracted(extracted);
+      setBsFile({ file, label: FORMAT_LABELS[detectFormat(file)], fieldsExtracted: count });
+      toast({ title: "Balance Sheet Parsed", description: `Extracted ${count} field(s). Please verify values.` });
+    } catch {
+      toast({ title: "Parsing Failed", description: "Could not read the Balance Sheet. Try a different format or use manual input.", variant: "destructive" });
     } finally {
-      setIsParsing(false);
+      setParsingBS(false);
+      if (bsInputRef.current) bsInputRef.current.value = "";
+    }
+  };
+
+  const handlePLUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setParsingPL(true);
+    try {
+      const extracted = await parseFinancialFile(file);
+      const plFields: (keyof WorkingCapitalData)[] = [
+        "sales", "cogs", "purchases", "expenses", "netProfit",
+      ];
+      let count = 0;
+      plFields.forEach((k) => { if (extracted[k] !== undefined) { setValue(k, extracted[k] as number); count++; } });
+      mergeExtracted(extracted);
+      setPlFile({ file, label: FORMAT_LABELS[detectFormat(file)], fieldsExtracted: count });
+      toast({ title: "P&L Statement Parsed", description: `Extracted ${count} field(s). Please verify values.` });
+    } catch {
+      toast({ title: "Parsing Failed", description: "Could not read the P&L statement. Try a different format or use manual input.", variant: "destructive" });
+    } finally {
+      setParsingPL(false);
+      if (plInputRef.current) plInputRef.current.value = "";
     }
   };
 
   const handleCalculate = () => {
     const data = getValues();
-    // parse all values to number just in case
     const cleanData: WorkingCapitalData = {};
-    Object.keys(data).forEach(k => {
+    Object.keys(data).forEach((k) => {
       cleanData[k as keyof WorkingCapitalData] = Number(data[k as keyof WorkingCapitalData]) || 0;
     });
-    
     const res = calculateWorkingCapital(cleanData);
     setResults(res);
   };
@@ -85,193 +116,292 @@ export default function WorkingCapital() {
       toast({ title: "Calculate First", description: "Please generate results before saving.", variant: "destructive" });
       return;
     }
-    
     const payload = {
-      clientName: "New Client " + new Date().toLocaleDateString(),
+      clientName: "WC Client " + new Date().toLocaleDateString(),
       caseType: "working_capital" as const,
       workingCapitalData: getValues() as any,
       workingCapitalResults: results as any,
     };
-
     createCase.mutate({ data: payload }, {
-      onSuccess: () => {
-        toast({ title: "Saved", description: "Case saved to storage successfully." });
-      },
-      onError: () => {
-        toast({ title: "Save Failed", description: "Could not save the case.", variant: "destructive" });
-      }
+      onSuccess: () => toast({ title: "Saved", description: "Case saved to storage." }),
+      onError: () => toast({ title: "Save Failed", description: "Could not save the case.", variant: "destructive" }),
     });
   };
+
+  const statusColor = (v: number | undefined, good: boolean) =>
+    v !== undefined && good ? "text-success" : "text-warning";
 
   return (
     <Layout>
       <div className="flex justify-between items-end mb-8">
         <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">Working Capital Analysis</h1>
-          <p className="text-muted-foreground mt-1">Extract or manually input BS & P&L data for ratio calculation</p>
+          <h1 className="text-3xl font-display font-bold">Working Capital Analysis</h1>
+          <p className="text-muted-foreground mt-1">Upload Balance Sheet & P&L or enter values manually</p>
         </div>
         <div className="flex gap-3">
-          <button 
-            onClick={() => exportToPDF("wc-report", "Working-Capital-Report.pdf")}
-            disabled={!results}
-            className="px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-muted font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50"
-          >
+          <button onClick={() => exportToPDF("wc-report", "Working-Capital-Report.pdf")} disabled={!results}
+            className="px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-muted font-medium text-sm flex items-center gap-2 disabled:opacity-50">
             <Download className="w-4 h-4" /> Export PDF
           </button>
-          <button 
-            onClick={handleSave}
-            disabled={!results || createCase.isPending}
-            className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-medium text-sm flex items-center gap-2 transition-all hover:shadow-lg hover:shadow-primary/20 disabled:opacity-50"
-          >
+          <button onClick={handleSave} disabled={!results || createCase.isPending}
+            className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-medium text-sm flex items-center gap-2 disabled:opacity-50">
             <Save className="w-4 h-4" /> {createCase.isPending ? "Saving..." : "Save Case"}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8" id="wc-report">
-        
-        {/* Left Column: Input & Parsing */}
-        <div className="xl:col-span-4 space-y-6">
-          <div className="glass-card p-6 rounded-2xl border border-border/50">
-            <h3 className="text-lg font-display font-semibold mb-4 flex items-center gap-2">
-              <UploadCloud className="w-5 h-5 text-secondary" /> Document Upload
-            </h3>
-            
-            <div className="relative group cursor-pointer border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-8 text-center transition-colors bg-background/50">
-              <input 
-                type="file" 
-                accept=".txt,.csv" 
-                onChange={handleFileUpload}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-              />
-              <FileText className="w-8 h-8 mx-auto text-muted-foreground group-hover:text-primary transition-colors mb-3" />
-              <p className="text-sm font-medium text-foreground mb-1">Drag & drop or click to upload</p>
-              <p className="text-xs text-muted-foreground">Supports .txt, .csv (Balance Sheet & P&L)</p>
-              
-              {isParsing && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center rounded-xl">
-                  <div className="flex flex-col items-center">
-                    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2" />
-                    <span className="text-xs font-medium">Parsing data...</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
 
-          <div className="glass-card p-6 rounded-2xl border border-border/50">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-display font-semibold flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-accent" /> Manual Input
-              </h3>
-              <button 
-                onClick={handleCalculate}
-                className="text-xs font-medium bg-primary/10 text-primary px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors"
-              >
-                Calculate
-              </button>
-            </div>
+        {/* ── LEFT: Upload + Manual ── */}
+        <div className="xl:col-span-4 space-y-5">
 
-            <form className="space-y-4">
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider border-b border-border/50 pb-2">Balance Sheet</h4>
-                {[
-                  { id: "currentAssets", label: "Current Assets (₹)" },
-                  { id: "currentLiabilities", label: "Current Liabilities (₹)" },
-                  { id: "inventory", label: "Inventory (₹)" },
-                  { id: "debtors", label: "Debtors (₹)" },
-                  { id: "creditors", label: "Creditors (₹)" },
-                  { id: "cash", label: "Cash & Bank (₹)" },
-                ].map(field => (
-                  <div key={field.id} className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-foreground/80">{field.label}</label>
-                    <input 
-                      type="number" 
-                      {...register(field.id as keyof WorkingCapitalData)}
-                      className="w-32 bg-background border border-border rounded-lg px-3 py-1.5 text-sm text-right focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                    />
-                  </div>
-                ))}
+          {/* Balance Sheet Upload */}
+          <UploadCard
+            title="Balance Sheet"
+            subtitle="Upload your Balance Sheet document"
+            color="blue"
+            accept={ACCEPTED_EXTENSIONS}
+            inputRef={bsInputRef}
+            isParsing={parsingBS}
+            uploadedFile={bsFile}
+            onClear={() => setBsFile(null)}
+            onChange={handleBSUpload}
+            formats={["PDF", "Excel", "JPEG/PNG", "TXT"]}
+          />
+
+          {/* P&L Upload */}
+          <UploadCard
+            title="Profit & Loss Statement"
+            subtitle="Upload your P&L / Income Statement"
+            color="teal"
+            accept={ACCEPTED_EXTENSIONS}
+            inputRef={plInputRef}
+            isParsing={parsingPL}
+            uploadedFile={plFile}
+            onClear={() => setPlFile(null)}
+            onChange={handlePLUpload}
+            formats={["PDF", "Excel", "JPEG/PNG", "TXT"]}
+          />
+
+          {/* Calculate CTA */}
+          <button
+            onClick={handleCalculate}
+            className="w-full py-3 rounded-2xl bg-primary text-primary-foreground font-display font-semibold text-base hover:bg-primary/90 transition-all hover:shadow-lg hover:shadow-primary/30 flex items-center justify-center gap-2"
+          >
+            <Calculator className="w-5 h-5" /> Calculate Ratios
+          </button>
+
+          {/* Manual Input — collapsible */}
+          <div className="glass-card rounded-2xl border border-border/50 overflow-hidden">
+            <button
+              onClick={() => setShowManual((v) => !v)}
+              className="w-full flex items-center justify-between p-5 hover:bg-white/5 transition-colors"
+            >
+              <span className="font-display font-semibold text-sm flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-accent" /> Manual Input / Override
+              </span>
+              {showManual ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+            </button>
+
+            {showManual && (
+              <div className="px-5 pb-5 space-y-5 border-t border-border/50 pt-4">
+                <ManualSection title="Balance Sheet" fields={[
+                  { id: "currentAssets", label: "Current Assets" },
+                  { id: "currentLiabilities", label: "Current Liabilities" },
+                  { id: "inventory", label: "Inventory" },
+                  { id: "debtors", label: "Debtors" },
+                  { id: "creditors", label: "Creditors" },
+                  { id: "cash", label: "Cash & Bank" },
+                ]} register={register} color="primary" />
+
+                <ManualSection title="Profit & Loss" fields={[
+                  { id: "sales", label: "Revenue / Sales" },
+                  { id: "cogs", label: "COGS" },
+                  { id: "purchases", label: "Purchases" },
+                  { id: "expenses", label: "Operating Expenses" },
+                  { id: "netProfit", label: "Net Profit" },
+                ]} register={register} color="secondary" />
               </div>
-
-              <div className="space-y-3 pt-4">
-                <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider border-b border-border/50 pb-2">Profit & Loss</h4>
-                {[
-                  { id: "sales", label: "Revenue/Sales (₹)" },
-                  { id: "cogs", label: "COGS (₹)" },
-                  { id: "purchases", label: "Purchases (₹)" },
-                  { id: "expenses", label: "Operating Exp. (₹)" },
-                  { id: "netProfit", label: "Net Profit (₹)" },
-                ].map(field => (
-                  <div key={field.id} className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-foreground/80">{field.label}</label>
-                    <input 
-                      type="number" 
-                      {...register(field.id as keyof WorkingCapitalData)}
-                      className="w-32 bg-background border border-border rounded-lg px-3 py-1.5 text-sm text-right focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                    />
-                  </div>
-                ))}
-              </div>
-            </form>
+            )}
           </div>
         </div>
 
-        {/* Right Column: Results */}
+        {/* ── RIGHT: Results ── */}
         <div className="xl:col-span-8 space-y-6">
           {!results ? (
-            <div className="h-full min-h-[400px] glass-card rounded-2xl border border-border/50 flex flex-col items-center justify-center text-muted-foreground">
-              <Info className="w-12 h-12 mb-4 opacity-20" />
-              <p>Upload a document or enter values manually to see results.</p>
+            <div className="h-full min-h-[500px] glass-card rounded-2xl border border-border/50 flex flex-col items-center justify-center text-muted-foreground gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Info className="w-8 h-8 text-primary opacity-60" />
+              </div>
+              <div className="text-center">
+                <p className="font-medium text-foreground/70">Upload documents or enter values</p>
+                <p className="text-sm mt-1">Then click "Calculate Ratios" to see results</p>
+              </div>
             </div>
           ) : (
             <>
-              {/* Primary Outcomes */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="glass-card p-6 rounded-2xl border border-primary/30 relative overflow-hidden group">
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Final Eligibility Amount</p>
-                  <h2 className="text-4xl font-display font-bold text-primary">₹{results.eligibilityAmount?.toLocaleString()}</h2>
-                  <p className="text-xs mt-2 text-foreground/60">Based on 75% of positive Working Capital</p>
+              {/* Eligibility Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="glass-card p-6 rounded-2xl border border-primary/40 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -translate-y-8 translate-x-8 blur-2xl" />
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Eligibility Amount</p>
+                  <h2 className="text-4xl font-display font-black text-primary">
+                    ₹{results.eligibilityAmount?.toLocaleString("en-IN")}
+                  </h2>
+                  <p className="text-xs mt-2 text-foreground/50">75% of Working Capital</p>
                 </div>
                 <div className="glass-card p-6 rounded-2xl border border-border/50">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Working Capital Amount</p>
-                  <h2 className="text-4xl font-display font-bold text-foreground">₹{results.workingCapitalAmount?.toLocaleString()}</h2>
-                  <p className="text-xs mt-2 text-foreground/60">Current Assets - Current Liabilities</p>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Net Working Capital</p>
+                  <h2 className={`text-4xl font-display font-black ${(results.workingCapitalAmount ?? 0) >= 0 ? "text-success" : "text-destructive"}`}>
+                    ₹{results.workingCapitalAmount?.toLocaleString("en-IN")}
+                  </h2>
+                  <p className="text-xs mt-2 text-foreground/50">Current Assets − Current Liabilities</p>
                 </div>
               </div>
 
-              {/* Ratios Grid */}
+              {/* Ratios */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <RatioCard title="Current Ratio" value={results.currentRatio} benchmark="> 1.33 Ideal" status={results.currentRatio! >= 1.33 ? "good" : "warn"} />
-                <RatioCard title="Quick Ratio" value={results.quickRatio} benchmark="> 1.0 Ideal" status={results.quickRatio! >= 1 ? "good" : "warn"} />
-                <RatioCard title="Inv. Turnover" value={results.inventoryTurnover} suffix="x" benchmark="Higher is better" status="neutral" />
-                <RatioCard title="Debtor Days" value={results.debtorDays} suffix=" d" benchmark="< 90 Ideal" status={results.debtorDays! <= 90 ? "good" : "warn"} />
-                <RatioCard title="Creditor Days" value={results.creditorDays} suffix=" d" benchmark="Depends on terms" status="neutral" />
-                <RatioCard title="WC Cycle (CCC)" value={results.workingCapitalCycle} suffix=" d" benchmark="Lower is better" status={results.workingCapitalCycle! < 60 ? "good" : "warn"} />
+                <RatioCard title="Current Ratio" value={results.currentRatio} suffix="x" benchmark="> 1.33" good={results.currentRatio! >= 1.33} />
+                <RatioCard title="Quick Ratio" value={results.quickRatio} suffix="x" benchmark="> 1.0" good={results.quickRatio! >= 1} />
+                <RatioCard title="Inventory Turnover" value={results.inventoryTurnover} suffix="x" benchmark="Higher is better" good={results.inventoryTurnover! >= 4} />
+                <RatioCard title="Debtor Days" value={results.debtorDays} suffix=" days" benchmark="< 90 days" good={results.debtorDays! <= 90} />
+                <RatioCard title="Creditor Days" value={results.creditorDays} suffix=" days" benchmark="Depends on terms" good neutral />
+                <RatioCard title="Working Capital Cycle" value={results.workingCapitalCycle} suffix=" days" benchmark="Lower is better" good={results.workingCapitalCycle! < 60} />
               </div>
+
+              {/* Additional Metrics */}
+              {(results.grossProfitMargin !== undefined || results.netProfitMargin !== undefined) && (
+                <div className="glass-card p-5 rounded-2xl border border-border/50">
+                  <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Profitability</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Gross Profit Margin</p>
+                      <p className={`text-2xl font-display font-bold ${(results.grossProfitMargin ?? 0) >= 20 ? "text-success" : "text-warning"}`}>
+                        {results.grossProfitMargin?.toFixed(1)}%
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Net Profit Margin</p>
+                      <p className={`text-2xl font-display font-bold ${(results.netProfitMargin ?? 0) >= 10 ? "text-success" : "text-warning"}`}>
+                        {results.netProfitMargin?.toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
-
       </div>
     </Layout>
   );
 }
 
-function RatioCard({ title, value, suffix = "", benchmark, status }: any) {
-  const colors = {
-    good: "text-success",
-    warn: "text-warning",
-    danger: "text-destructive",
-    neutral: "text-secondary"
-  };
-  
+// ── Upload Card Component ─────────────────────────────────────────────────────
+function UploadCard({
+  title, subtitle, color, accept, inputRef, isParsing, uploadedFile, onClear, onChange, formats,
+}: {
+  title: string; subtitle: string; color: "blue" | "teal"; accept: string;
+  inputRef: React.RefObject<HTMLInputElement>; isParsing: boolean;
+  uploadedFile: { file: File; label: string; fieldsExtracted: number } | null;
+  onClear: () => void; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  formats: string[];
+}) {
+  const borderHover = color === "blue" ? "hover:border-blue-500/50" : "hover:border-primary/50";
+  const iconColor = color === "blue" ? "text-blue-400" : "text-primary";
+
+  return (
+    <div className="glass-card p-5 rounded-2xl border border-border/50">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="font-display font-semibold text-sm">{title}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+        </div>
+        {uploadedFile && (
+          <button onClick={onClear} className="p-1 rounded-lg hover:bg-white/10 text-muted-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {uploadedFile ? (
+        <div className="rounded-xl border border-success/30 bg-success/5 px-4 py-3 flex items-center gap-3">
+          {formatIcon(detectFormat(uploadedFile.file))}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{uploadedFile.file.name}</p>
+            <p className="text-xs text-muted-foreground">{uploadedFile.label} · {uploadedFile.fieldsExtracted} field(s) extracted</p>
+          </div>
+          <CheckCircle className="w-5 h-5 text-success shrink-0" />
+        </div>
+      ) : (
+        <div className={`relative group cursor-pointer border-2 border-dashed border-border ${borderHover} rounded-xl p-6 text-center transition-colors bg-background/40`}>
+          <input ref={inputRef} type="file" accept={accept} onChange={onChange}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+
+          {isParsing ? (
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className={`w-7 h-7 ${iconColor} animate-spin`} />
+              <p className="text-sm font-medium">Parsing document…</p>
+              <p className="text-xs text-muted-foreground">Extracting financial data</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <UploadCloud className={`w-7 h-7 ${iconColor} group-hover:scale-110 transition-transform`} />
+              <p className="text-sm font-medium">Click or drag & drop</p>
+              <div className="flex flex-wrap justify-center gap-1 mt-1">
+                {formats.map((f) => (
+                  <span key={f} className="text-[10px] bg-white/5 border border-border/50 px-2 py-0.5 rounded-full text-muted-foreground">{f}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Manual Input Section ──────────────────────────────────────────────────────
+function ManualSection({ title, fields, register, color }: {
+  title: string; fields: { id: string; label: string }[];
+  register: any; color: "primary" | "secondary";
+}) {
+  const focusClass = color === "primary"
+    ? "focus:border-primary focus:ring-primary"
+    : "focus:border-secondary focus:ring-secondary";
+
+  return (
+    <div className="space-y-2">
+      <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{title}</h4>
+      {fields.map((f) => (
+        <div key={f.id} className="flex items-center justify-between gap-3">
+          <label className="text-xs font-medium text-foreground/80 shrink-0">{f.label} (₹)</label>
+          <input
+            type="number"
+            {...register(f.id)}
+            className={`w-28 bg-background border border-border rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 transition-all ${focusClass}`}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Ratio Card ────────────────────────────────────────────────────────────────
+function RatioCard({ title, value, suffix = "", benchmark, good, neutral }: {
+  title: string; value?: number; suffix?: string; benchmark: string; good?: boolean; neutral?: boolean;
+}) {
+  const color = neutral
+    ? "text-secondary"
+    : good
+    ? "text-success"
+    : "text-warning";
+
   return (
     <div className="glass-card p-4 rounded-xl border border-border/50">
-      <h4 className="text-xs font-medium text-muted-foreground mb-2">{title}</h4>
-      <div className={`text-2xl font-display font-bold ${colors[status as keyof typeof colors]}`}>
-        {value}{suffix}
+      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">{title}</p>
+      <div className={`text-2xl font-display font-bold ${color}`}>
+        {value?.toFixed(2)}{suffix}
       </div>
       <p className="text-[10px] text-muted-foreground mt-1">{benchmark}</p>
     </div>
