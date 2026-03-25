@@ -24,6 +24,9 @@ import { DonutGauge, HorizontalBarChart } from "@/lib/charts";
 
 const C = Colors.light;
 
+// Module-level helper — used by both BankingScreen and BankingFinalSummary
+const scoreColor = (s: number) => s >= 75 ? C.success : s >= 55 ? C.warning : C.danger;
+
 const FIELDS: { key: keyof BankingData; label: string; section: "credit" | "balance" | "risk" }[] = [
   { key: "totalCredits",        label: "Total Credits",          section: "credit" },
   { key: "totalDebits",         label: "Total Debits",           section: "credit" },
@@ -145,8 +148,6 @@ export default function BankingScreen() {
     } catch { Alert.alert("Save Failed", "Could not save the case."); }
     finally { setSaving(false); }
   };
-
-  const scoreColor = (s: number) => s >= 75 ? C.success : s >= 55 ? C.warning : C.danger;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
