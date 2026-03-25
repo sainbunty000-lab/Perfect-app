@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, Component } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Platform,
@@ -26,6 +26,40 @@ const C = Colors.light;
 
 // Module-level helper — used by both BankingScreen and BankingFinalSummary
 const scoreColor = (s: number) => s >= 75 ? C.success : s >= 55 ? C.warning : C.danger;
+
+// Safe rgba helper — avoids 8-digit hex which can break on some Android builds
+function withAlpha(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha.toFixed(2)})`;
+}
+
+// Catches render-time errors and shows the actual message instead of a blank screen
+class ResultsErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { error: string | null }
+> {
+  state = { error: null };
+  static getDerivedStateFromError(e: any) {
+    return { error: e?.message ?? "Unknown render error" };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={{ backgroundColor: "#1A0000", borderRadius: 14, padding: 16, gap: 8 }}>
+          <Text style={{ color: "#EF4444", fontFamily: "Inter_700Bold", fontSize: 13 }}>
+            Results render error — please report this:
+          </Text>
+          <Text style={{ color: "#FF9999", fontFamily: "Inter_400Regular", fontSize: 11 }}>
+            {this.state.error}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const FIELDS: { key: keyof BankingData; label: string; section: "credit" | "balance" | "risk" }[] = [
   { key: "totalCredits",        label: "Total Credits",          section: "credit" },
@@ -121,8 +155,13 @@ export default function BankingScreen() {
   };
 
   const handleCalculate = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setResults(calculateBanking(data));
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const r = calculateBanking(data);
+      setResults(r);
+    } catch (e: any) {
+      Alert.alert("Calculation Error", e?.message ?? "Could not calculate results.");
+    }
   };
 
   const handleExportPDF = async () => {
@@ -264,16 +303,16 @@ export default function BankingScreen() {
 
           {/* ── Results ──────────────────────────────────────────── */}
           {results && (
-            <>
+            <ResultsErrorBoundary>
               <LinearGradient
-                colors={[scoreColor(results.overallScore) + "22", "#152236"]}
+                colors={[withAlpha(scoreColor(results.overallScore), 0.13), "#152236"]}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                 style={styles.scoreCard}
               >
                 <View style={styles.scoreLeft}>
                   <Text style={styles.assessLabel}>Credit Risk Assessment</Text>
                   <Text style={styles.assessText}>{results.creditRiskAssessment}</Text>
-                  <View style={[styles.riskBadge, { backgroundColor: scoreColor(results.overallScore) + "30" }]}>
+                  <View style={[styles.riskBadge, { backgroundColor: withAlpha(scoreColor(results.overallScore), 0.19) }]}>
                     <Text style={[styles.riskText, { color: scoreColor(results.overallScore) }]}>
                       Risk Level: {results.riskLevel}
                     </Text>
@@ -328,12 +367,12 @@ export default function BankingScreen() {
               <BankingFinalSummary results={results} />
 
               <View style={styles.actionRow}>
-                <TouchableOpacity style={[styles.actionBtn, { borderColor: C.primary + "60" }]}
+                <TouchableOpacity style={[styles.actionBtn, { borderColor: withAlpha(C.primary, 0.38) }]}
                   onPress={() => setSaveModal(true)}>
                   <Feather name="save" size={16} color={C.primary} />
                   <Text style={[styles.actionBtnText, { color: C.primary }]}>Save Case</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionBtn, { borderColor: C.secondary + "60" }]}
+                <TouchableOpacity style={[styles.actionBtn, { borderColor: withAlpha(C.secondary, 0.38) }]}
                   onPress={handleExportPDF} disabled={exporting}>
                   {exporting
                     ? <ActivityIndicator size="small" color={C.secondary} />
@@ -341,7 +380,7 @@ export default function BankingScreen() {
                   <Text style={[styles.actionBtnText, { color: C.secondary }]}>Export PDF</Text>
                 </TouchableOpacity>
               </View>
-            </>
+            </ResultsErrorBoundary>
           )}
           <TabNavBar current="banking" />
         </ScrollView>
@@ -410,7 +449,7 @@ function BankingFinalSummary({ results }: { results: BankingResults }) {
 
   return (
     <View style={bSumS.wrap}>
-      <View style={[bSumS.header, { backgroundColor: color + "18", borderColor: color + "55" }]}>
+      <View style={[bSumS.header, { backgroundColor: withAlpha(color, 0.09), borderColor: withAlpha(color, 0.33) }]}>
         <View style={[bSumS.gradeCircle, { borderColor: color }]}>
           <Text style={[bSumS.gradeText, { color }]}>{grade}</Text>
         </View>
@@ -470,7 +509,7 @@ const bSumS = StyleSheet.create({
   sectionTitle: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#10B981", textTransform: "uppercase", letterSpacing: 0.8 },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   rowText: { flex: 1, fontSize: 12, color: "#9BBDD4", fontFamily: "Inter_400Regular", lineHeight: 17 },
-  recBox: { backgroundColor: "#0A1628", borderRadius: 12, borderWidth: 1, borderColor: C.primary + "30", padding: 12, gap: 8 },
+  recBox: { backgroundColor: "#0A1628", borderRadius: 12, borderWidth: 1, borderColor: withAlpha(C.primary, 0.19), padding: 12, gap: 8 },
   recHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   recTitle: { fontSize: 10, fontFamily: "Inter_700Bold", color: C.primary, textTransform: "uppercase", letterSpacing: 0.8 },
   recText: { fontSize: 12, color: "#8BAFC9", fontFamily: "Inter_400Regular", lineHeight: 18 },
@@ -496,7 +535,7 @@ function StatusBadge({ label, value }: { label: string; value: string | undefine
   return (
     <LinearGradient colors={["#1A2C42", "#152236"]} style={styles.badge}>
       <Text style={styles.badgeLabel}>{label}</Text>
-      <View style={[styles.badgeTag, { backgroundColor: color + "25" }]}>
+      <View style={[styles.badgeTag, { backgroundColor: withAlpha(color, 0.15) }]}>
         <Text style={[styles.badgeValue, { color }]}>{value}</Text>
       </View>
     </LinearGradient>
