@@ -33,7 +33,17 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `artifacts/financial-analyzer/src/lib/gst-itr-parser.ts` — `parseGstItrFile()`, `analyzeGstItr()`
 
 ### Mobile App (`artifacts/financial-mobile`)
-- Expo React Native app mirroring web modules, sends files to `/api/parse-document`
+- Expo React Native app with dark navy/teal glassmorphism theme (PageBackground, GlassCard, UploadZone, GradientButton, MetricTile shared in `components/UI.tsx`)
+- **Working Capital** tab — separate Balance Sheet + P&L upload zones, each calls `/api/parse-financial` with `docType=balance_sheet` or `profit_loss`
+- **Banking Analysis** tab — single bank statement upload, calls `/api/parse-financial` with `docType=banking`, auto-detects bank name + period
+- **GST & ITR** tab — **two separate upload zones**: GSTR section (docType=`gstr`) and ITR section (docType=`itr`) — full extracted fields shown per section before combined analysis
+- **Saved Cases** tab — DB-backed case list
+- All parsing via server-side `parseFinancialDocument()` in `lib/parseViaApi.ts` — 100% server-side accuracy, no client regex
+
+### API Server — Financial Parsing (`artifacts/api-server`)
+- `POST /api/parse-financial` — accepts `file` + `docType`, auto-detects format (PDF/Excel/Image/CSV), runs OCR if needed, returns `{ text, format, fields }` with fully structured financial data
+- `POST /api/parse-document` — legacy raw text extraction endpoint (still used by other tooling)
+- `src/lib/financialParser.ts` — position-aware structured extractors for BS, P&L, Banking, GSTR, ITR
 
 ## Structure
 

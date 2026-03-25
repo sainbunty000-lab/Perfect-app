@@ -12,7 +12,7 @@ import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { calculateWorkingCapital } from "@/lib/calculations";
 import type { WorkingCapitalData, WorkingCapitalResults } from "@/lib/calculations";
-import { parseFileViaApi, FORMAT_LABEL } from "@/lib/parseViaApi";
+import { parseFinancialDocument, FORMAT_LABEL } from "@/lib/parseViaApi";
 import { exportWorkingCapitalPDF } from "@/lib/pdfExport";
 import { useCreateCase } from "@workspace/api-client-react";
 import { PageBackground, PageHeader } from "@/components/UI";
@@ -38,145 +38,6 @@ const PL_FIELDS: { key: keyof WorkingCapitalData; label: string }[] = [
 
 const INR = (n?: number) =>
   n !== undefined ? "₹" + Math.abs(n).toLocaleString("en-IN") : "—";
-
-// ─── Improved text parser (handles Indian numbers, 2-column PDFs) ─────────────
-function parseIndianNum(raw: string): number | null {
-  const s = raw.trim().replace(/[₹$€£]/g, "").replace(/\bRs\.?\b/gi, "").replace(/\s/g, "").replace(/[()]/g, "");
-  const cleaned = s.replace(/,/g, "");
-  const val = parseFloat(cleaned);
-  return isNaN(val) ? null : Math.abs(val);
-}
-
-function extractNums(str: string): number[] {
-  const pattern = /\([\d,]+(?:\.\d+)?\)|[\d,]+(?:\.\d+)?/g;
-  const out: number[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = pattern.exec(str)) !== null) {
-    const v = parseIndianNum(m[0]);
-    if (v !== null && v >= 0) out.push(v);
-  }
-  return out;
-}
-
-function parseWorkingCapitalText(text: string): Partial<WorkingCapitalData> {
-  const lines = text
-    .replace(/\t/g, "  ")
-    .replace(/ {3,}/g, "   ")
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
-
-  const findVal = (keywords: string[], excludeKeywords: string[] = []): number | undefined => {
-    const candidates: number[] = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const lower = line.toLowerCase();
-
-      let matchPos = -1, matchLen = 0;
-      for (const kw of keywords) {
-        const pos = lower.indexOf(kw.toLowerCase());
-        if (pos !== -1) { matchPos = pos; matchLen = kw.length; break; }
-      }
-      if (matchPos === -1) continue;
-
-      if (excludeKeywords.length > 0) {
-        const exBefore = lower.slice(0, matchPos);
-        const exAfter  = lower.slice(matchPos + matchLen);
-        const skip = excludeKeywords.some((ex) => {
-          const exL = ex.toLowerCase();
-          if (exAfter.includes(exL)) return true;
-          const idx = exBefore.lastIndexOf(exL);
-          if (idx === -1) return false;
-          return matchPos - (idx + exL.length) <= 20;
-        });
-        if (skip) continue;
-      }
-
-      const afterKw = line.slice(matchPos + matchLen);
-      const nums = extractNums(afterKw).filter((n) => n >= 1);
-      if (nums.length > 0) { candidates.push(nums[0]); continue; }
-
-      for (let d = 1; d <= 3; d++) {
-        if (i + d >= lines.length) break;
-        const ns = extractNums(lines[i + d]).filter((n) => n >= 1);
-        if (ns.length > 0) { candidates.push(ns[0]); break; }
-      }
-    }
-    return candidates.length > 0 ? candidates[0] : undefined;
-  };
-
-  const compCash = findVal([
-    "bank and cash balance", "cash and bank balance", "cash and bank",
-    "cash & bank", "balance with bank", "bank balance", "cash in hand",
-  ], ["overdraft", "od limit", "cash credit"]);
-
-  const compDebtors = findVal([
-    "sundry debtors", "trade debtors", "trade receivables",
-    "accounts receivable", "book debts", "debtors",
-  ], ["bad debts", "provision for doubtful", "creditors"]);
-
-  const compInventory = findVal([
-    "closing stock", "closing inventory", "stock-in-trade", "inventories",
-    "finished goods", "raw material stock", "work-in-progress", "stock",
-  ]);
-
-  const compAdvances = findVal([
-    "loans & advances", "loans and advances", "advance to", "prepaid", "other current assets",
-  ], ["secured loans", "unsecured loans", "term loan"]);
-
-  const caLabel =
-    findVal(["total current assets"]) ??
-    findVal(["net current assets"]) ??
-    findVal(["current assets"], ["non-current", "fixed assets"]);
-  const caSum = (compCash || 0) + (compDebtors || 0) + (compInventory || 0) + (compAdvances || 0);
-  const currentAssets = caSum > (caLabel || 0) ? caSum : (caLabel || caSum || undefined);
-
-  const compCreditors = findVal([
-    "sundry creditors", "trade creditors", "trade payables", "accounts payable", "creditors",
-  ], ["debtors", "receivable"]);
-
-  const compProvisions = findVal([
-    "other provision b/s", "other current liabilities", "provisions", "accrued liabilities",
-  ], ["for taxation", "income tax"]);
-
-  const clLabel =
-    findVal(["total current liabilities"]) ??
-    findVal(["current liabilities"], ["non-current"]);
-  const clSum = (compCreditors || 0) + (compProvisions || 0);
-  const currentLiabilities = clLabel ?? (clSum > 0 ? clSum : undefined);
-
-  const compSales = findVal([
-    "net sales", "net revenue", "revenue from operations", "total income from operations",
-    "gross receipts", "gross sales", "turnover", "revenue", "sales",
-  ], ["cost of", "purchase"]);
-
-  const compCogs = findVal(["cost of goods sold", "cost of sales", "cogs"]);
-  const compPurchases = findVal(["purchases", "material cost"]);
-
-  const compExpenses = findVal([
-    "total expenses", "operating expenses", "total expenditure",
-    "expenses", "overheads",
-  ], ["depreciation", "finance cost"]);
-
-  const compNetProfit = findVal([
-    "profit after tax", "net profit after tax", "profit for the year",
-    "net profit", "profit", "pat",
-  ]);
-
-  return {
-    currentAssets,
-    currentLiabilities,
-    inventory: compInventory,
-    debtors: compDebtors,
-    creditors: compCreditors,
-    cash: compCash,
-    sales: compSales,
-    cogs: compCogs,
-    purchases: compPurchases,
-    expenses: compExpenses,
-    netProfit: compNetProfit,
-  };
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -225,11 +86,12 @@ export default function WorkingCapitalScreen() {
       let merged: Partial<WorkingCapitalData> = {};
 
       try {
-        const parsed = await parseFileViaApi(asset.uri, asset.name, asset.mimeType ?? undefined);
-        const all = parseWorkingCapitalText(parsed.text);
-        // Only apply fields relevant to this section
+        // Use server-side structured parser — same accuracy as the web app
+        const docType = section === "bs" ? "balance_sheet" : "profit_loss";
+        const parsed = await parseFinancialDocument(asset.uri, asset.name, asset.mimeType ?? undefined, docType);
+        const fields = parsed.fields as Partial<WorkingCapitalData>;
         for (const key of relevantKeys) {
-          if (all[key] !== undefined) merged[key] = all[key];
+          if ((fields as any)[key] !== undefined) merged[key] = (fields as any)[key];
         }
         setSlot({ name: asset.name, format: FORMAT_LABEL[parsed.format] });
       } catch {

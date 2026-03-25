@@ -6,6 +6,7 @@ import { writeFile, unlink } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { randomBytes } from "crypto";
+import { parseFinancialDocument, type DocType } from "../lib/financialParser";
 
 const execFileAsync = promisify(execFile);
 const router: IRouter = Router();
@@ -208,6 +209,70 @@ router.post("/parse-document", upload.single("file"), async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "parse-document failed");
     res.status(500).json({ message: "Failed to parse document" });
+  }
+});
+
+// ── /api/parse-financial ──────────────────────────────────────────────────────
+// Accepts a file + docType, extracts text, then runs the structured parser.
+// Returns { text, format, fields } — fields is fully structured financial data.
+
+router.post("/parse-financial", upload.single("file"), async (req, res) => {
+  if (!req.file) { res.status(400).json({ message: "No file uploaded" }); return; }
+
+  const docType = (req.body?.docType ?? "") as DocType;
+  const validTypes: DocType[] = ["balance_sheet", "profit_loss", "banking", "gstr", "itr"];
+  if (!validTypes.includes(docType)) {
+    res.status(400).json({ message: `Invalid docType. Must be one of: ${validTypes.join(", ")}` });
+    return;
+  }
+
+  const { buffer, mimetype, originalname } = req.file;
+  const filename = (originalname ?? "").toLowerCase();
+
+  try {
+    let text = "";
+    let format = "text";
+
+    const isPdf   = filename.endsWith(".pdf") || mimetype === "application/pdf";
+    const isExcel = filename.endsWith(".xlsx") || filename.endsWith(".xls") || mimetype.includes("spreadsheet") || mimetype.includes("excel");
+    const isImage = mimetype.startsWith("image/") || /\.(jpg|jpeg|png|webp|tiff|bmp)$/.test(filename);
+
+    if (isPdf) {
+      format = "pdf";
+      text = await extractPdfText(buffer);
+    } else if (isExcel) {
+      format = "excel";
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(buffer, { type: "buffer" });
+      const parts: string[] = [];
+      for (const sn of wb.SheetNames) {
+        const csv = XLSX.utils.sheet_to_csv(wb.Sheets[sn], { blankrows: false });
+        if (csv.trim()) parts.push(`--- Sheet: ${sn} ---\n${csv}`);
+      }
+      text = parts.join("\n\n");
+    } else if (isImage) {
+      format = "image";
+      try { text = await visionOcrImage(buffer, mimetype || "image/jpeg"); }
+      catch {
+        try {
+          const { createWorker } = await import("tesseract.js");
+          const worker = await createWorker("eng", 1, { logger: () => {} });
+          const { data } = await worker.recognize(buffer);
+          text = data.text ?? "";
+          await worker.terminate();
+        } catch { text = ""; }
+      }
+    } else {
+      format = "text";
+      text = buffer.toString("utf-8");
+    }
+
+    const fields = parseFinancialDocument(text, docType);
+    res.json({ text, format, fields });
+
+  } catch (err) {
+    req.log.error({ err }, "parse-financial failed");
+    res.status(500).json({ message: "Failed to parse financial document" });
   }
 });
 

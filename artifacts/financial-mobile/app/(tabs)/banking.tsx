@@ -13,91 +13,34 @@ import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { calculateBanking } from "@/lib/calculations";
 import type { BankingData, BankingResults } from "@/lib/calculations";
-import { parseFileViaApi, FORMAT_LABEL } from "@/lib/parseViaApi";
+import { parseFinancialDocument, FORMAT_LABEL } from "@/lib/parseViaApi";
 import { exportBankingPDF } from "@/lib/pdfExport";
 import { useCreateCase } from "@workspace/api-client-react";
 import {
   PageBackground, PageHeader, GlassCard, UploadZone,
-  GradientButton, MetricTile, CardTitle,
+  GradientButton, CardTitle,
 } from "@/components/UI";
 
 const C = Colors.light;
 
-const FIELDS: { key: keyof BankingData; label: string }[] = [
-  { key: "totalCredits",       label: "Total Credits" },
-  { key: "totalDebits",        label: "Total Debits" },
-  { key: "averageBalance",     label: "Average Balance" },
-  { key: "minimumBalance",     label: "Minimum Balance" },
-  { key: "openingBalance",     label: "Opening Balance" },
-  { key: "closingBalance",     label: "Closing Balance" },
-  { key: "cashDeposits",       label: "Cash Deposits" },
-  { key: "chequeReturns",      label: "Cheque Bounces (#)" },
-  { key: "loanRepayments",     label: "Loan Repayments" },
-  { key: "overdraftUsage",     label: "Overdraft Usage" },
-  { key: "ecsEmiPayments",     label: "ECS / EMI Payments" },
-  { key: "transactionFrequency", label: "No. of Transactions" },
+const FIELDS: { key: keyof BankingData; label: string; section: "credit" | "balance" | "risk" }[] = [
+  { key: "totalCredits",        label: "Total Credits",          section: "credit" },
+  { key: "totalDebits",         label: "Total Debits",           section: "credit" },
+  { key: "averageBalance",      label: "Average Balance",        section: "balance" },
+  { key: "minimumBalance",      label: "Minimum Balance",        section: "balance" },
+  { key: "openingBalance",      label: "Opening Balance",        section: "balance" },
+  { key: "closingBalance",      label: "Closing Balance",        section: "balance" },
+  { key: "cashDeposits",        label: "Cash Deposits",          section: "risk" },
+  { key: "chequeReturns",       label: "Cheque Bounces (#)",     section: "risk" },
+  { key: "loanRepayments",      label: "Loan Repayments",        section: "risk" },
+  { key: "overdraftUsage",      label: "Overdraft Usage",        section: "risk" },
+  { key: "ecsEmiPayments",      label: "ECS / EMI Payments",     section: "risk" },
+  { key: "transactionFrequency",label: "No. of Transactions",    section: "risk" },
 ];
 
 const INR = (n?: number) => n !== undefined ? "₹" + Math.abs(n).toLocaleString("en-IN") : "—";
 
-function parseBankingText(text: string): Partial<BankingData> {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const getNum = (keywords: string[]): number | undefined => {
-    for (const line of lines) {
-      const lower = line.toLowerCase();
-      if (keywords.some((k) => lower.includes(k))) {
-        const nums = line.match(/-?[\d,]+(?:\.\d+)?/g);
-        if (nums) {
-          const v = parseFloat(nums[nums.length - 1].replace(/,/g, ""));
-          if (!isNaN(v) && Math.abs(v) >= 1) return Math.abs(v);
-        }
-      }
-    }
-    return undefined;
-  };
-
-  const isCSV = text.includes(",") && lines[0]?.includes(",");
-  if (isCSV) {
-    const headers = lines[0].toLowerCase().split(",").map((h) => h.trim().replace(/"/g, ""));
-    const crIdx = headers.findIndex((h) => h.includes("credit") || h.includes("deposit"));
-    const drIdx = headers.findIndex((h) => h.includes("debit") || h.includes("withdrawal"));
-    const balIdx = headers.findIndex((h) => h.includes("balance"));
-    let totalCr = 0, totalDr = 0;
-    const balances: number[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(",").map((c) => c.trim().replace(/"/g, ""));
-      if (crIdx >= 0 && cols[crIdx]) totalCr += parseFloat(cols[crIdx].replace(/,/g, "")) || 0;
-      if (drIdx >= 0 && cols[drIdx]) totalDr += parseFloat(cols[drIdx].replace(/,/g, "")) || 0;
-      if (balIdx >= 0 && cols[balIdx]) { const b = parseFloat(cols[balIdx].replace(/,/g, "")); if (!isNaN(b)) balances.push(b); }
-    }
-    return {
-      totalCredits: Math.round(totalCr) || undefined,
-      totalDebits: Math.round(totalDr) || undefined,
-      openingBalance: balances[0],
-      closingBalance: balances[balances.length - 1],
-      averageBalance: balances.length ? Math.round(balances.reduce((a, b) => a + b, 0) / balances.length) : undefined,
-      minimumBalance: balances.length ? Math.round(Math.min(...balances)) : undefined,
-      transactionFrequency: lines.length - 1,
-    };
-  }
-
-  return {
-    totalCredits: getNum(["total credits", "total credit", "total amount credited", "total inflow"]),
-    totalDebits: getNum(["total debits", "total debit", "total amount debited", "total outflow"]),
-    averageBalance: getNum(["average balance", "avg balance", "average monthly balance"]),
-    minimumBalance: getNum(["minimum balance", "min balance"]),
-    openingBalance: getNum(["opening balance"]),
-    closingBalance: getNum(["closing balance"]),
-    chequeReturns: getNum(["cheque return", "bounce", "dishonour", "returned"]),
-    loanRepayments: getNum(["loan repayment", "emi paid", "loan emi"]),
-    overdraftUsage: getNum(["overdraft", "od usage"]),
-    ecsEmiPayments: getNum(["ecs", "nach", "emi payment"]),
-    cashDeposits: getNum(["cash deposit"]),
-    transactionFrequency: getNum(["total transactions", "number of transactions"]),
-  };
-}
-
-type SlotInfo = { name: string; format: string } | null;
+type SlotInfo = { name: string; format: string; bankName?: string; period?: string } | null;
 
 export default function BankingScreen() {
   const insets = useSafeAreaInsets();
@@ -126,13 +69,36 @@ export default function BankingScreen() {
       if (result.canceled) return;
       const asset = result.assets[0];
       setParsing(true);
-      const parsed = await parseFileViaApi(asset.uri, asset.name, asset.mimeType ?? undefined);
-      const fields = parseBankingText(parsed.text);
-      setData((d) => ({ ...d, ...fields }));
-      setSlot({ name: asset.name, format: FORMAT_LABEL[parsed.format] });
+
+      // Server-side structured extraction — no guesswork on the device
+      const parsed = await parseFinancialDocument(asset.uri, asset.name, asset.mimeType ?? undefined, "banking");
+      const f = parsed.fields as any;
+
+      setData((d) => ({
+        ...d,
+        ...(f.totalCredits         !== undefined && { totalCredits:         f.totalCredits }),
+        ...(f.totalDebits          !== undefined && { totalDebits:          f.totalDebits }),
+        ...(f.averageBalance       !== undefined && { averageBalance:       f.averageBalance }),
+        ...(f.minimumBalance       !== undefined && { minimumBalance:       f.minimumBalance }),
+        ...(f.openingBalance       !== undefined && { openingBalance:       f.openingBalance }),
+        ...(f.closingBalance       !== undefined && { closingBalance:       f.closingBalance }),
+        ...(f.cashDeposits         !== undefined && { cashDeposits:         f.cashDeposits }),
+        ...(f.chequeReturns        !== undefined && { chequeReturns:        f.chequeReturns }),
+        ...(f.loanRepayments       !== undefined && { loanRepayments:       f.loanRepayments }),
+        ...(f.overdraftUsage       !== undefined && { overdraftUsage:       f.overdraftUsage }),
+        ...(f.ecsEmiPayments       !== undefined && { ecsEmiPayments:       f.ecsEmiPayments }),
+        ...(f.transactionFrequency !== undefined && { transactionFrequency: f.transactionFrequency }),
+      }));
+
+      setSlot({
+        name:     asset.name,
+        format:   FORMAT_LABEL[parsed.format],
+        bankName: f.bankName,
+        period:   f.statementPeriod,
+      });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      Alert.alert("Parse Failed", "Could not read the file. Try a CSV or PDF statement.");
+    } catch (e: any) {
+      Alert.alert("Parse Failed", e?.message ?? "Could not read the file. Try a CSV or PDF statement.");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setParsing(false);
@@ -181,44 +147,79 @@ export default function BankingScreen() {
         >
           <PageHeader
             title="Banking Analysis"
-            subtitle="Upload a bank statement to analyze performance"
+            subtitle="Upload a bank statement for automatic extraction"
             accentColor={C.accent}
           />
 
-          {/* Upload zone */}
-          <UploadZone
-            onPress={handlePickFile}
-            loading={parsing}
-            uploaded={!!slot}
-            fileName={slot?.name}
-            label="Upload Statement — PDF / Excel / CSV / Image"
-            accentColor={C.accent}
-            onClear={() => setSlot(null)}
-          />
-          {slot && (
-            <Text style={styles.formatChip}>{slot.format} · values extracted from statement</Text>
-          )}
-
-          {/* Manual input card */}
+          {/* ── Upload Section ───────────────────────────────────── */}
           <GlassCard accentColor={C.accent}>
-            <CardTitle>Statement Values</CardTitle>
-            {FIELDS.map((f) => (
-              <View key={f.key} style={styles.inputRow}>
-                <Text style={styles.inputLabel}>{f.label}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={data[f.key] ? String(data[f.key]) : ""}
-                  onChangeText={(v) => set(f.key, v)}
-                  keyboardType="numeric"
-                  placeholder="0"
-                  placeholderTextColor="#3D5A74"
-                  returnKeyType="done"
-                />
+            <CardTitle>Bank Statement Upload</CardTitle>
+            <Text style={styles.sectionHint}>
+              Supports: HDFC · SBI · ICICI · Axis · Kotak · PNB · all major banks{"\n"}
+              Format: PDF · Excel · CSV · Image (scanned)
+            </Text>
+
+            <UploadZone
+              onPress={handlePickFile}
+              loading={parsing}
+              uploaded={!!slot}
+              fileName={slot?.name}
+              label="Upload Bank Statement"
+              accentColor={C.accent}
+              onClear={() => { setSlot(null); setData({}); setResults(null); }}
+            />
+
+            {/* Detected metadata */}
+            {slot && (
+              <View style={styles.metaBox}>
+                {slot.bankName && (
+                  <View style={styles.metaRow}>
+                    <Feather name="home" size={12} color={C.accent} />
+                    <Text style={styles.metaText}>{slot.bankName} detected</Text>
+                  </View>
+                )}
+                {slot.period && (
+                  <View style={styles.metaRow}>
+                    <Feather name="calendar" size={12} color={C.textSecondary} />
+                    <Text style={styles.metaText}>{slot.period}</Text>
+                  </View>
+                )}
+                <View style={styles.metaRow}>
+                  <Feather name="file" size={12} color={C.textSecondary} />
+                  <Text style={styles.metaText}>{slot.format} · values auto-filled below</Text>
+                </View>
               </View>
+            )}
+          </GlassCard>
+
+          {/* ── Credits & Debits ─────────────────────────────────── */}
+          <GlassCard accentColor={C.accent}>
+            <CardTitle>Credits & Debits</CardTitle>
+            {FIELDS.filter((f) => f.section === "credit").map((f) => (
+              <InputRow key={f.key} label={f.label} value={data[f.key] ? String(data[f.key]) : ""}
+                onChangeText={(v) => set(f.key, v)} />
             ))}
           </GlassCard>
 
-          {/* Calculate button */}
+          {/* ── Balances ─────────────────────────────────────────── */}
+          <GlassCard accentColor={C.primary}>
+            <CardTitle>Account Balances</CardTitle>
+            {FIELDS.filter((f) => f.section === "balance").map((f) => (
+              <InputRow key={f.key} label={f.label} value={data[f.key] ? String(data[f.key]) : ""}
+                onChangeText={(v) => set(f.key, v)} />
+            ))}
+          </GlassCard>
+
+          {/* ── Risk Indicators ──────────────────────────────────── */}
+          <GlassCard accentColor={C.secondary}>
+            <CardTitle>Risk Indicators</CardTitle>
+            {FIELDS.filter((f) => f.section === "risk").map((f) => (
+              <InputRow key={f.key} label={f.label} value={data[f.key] ? String(data[f.key]) : ""}
+                onChangeText={(v) => set(f.key, v)} />
+            ))}
+          </GlassCard>
+
+          {/* Calculate */}
           <GradientButton
             onPress={handleCalculate}
             label="Analyze Performance"
@@ -227,10 +228,9 @@ export default function BankingScreen() {
             textColor="#000"
           />
 
-          {/* Results */}
+          {/* ── Results ──────────────────────────────────────────── */}
           {results && (
             <>
-              {/* Score card */}
               <LinearGradient
                 colors={[scoreColor(results.overallScore) + "22", "#152236"]}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -241,7 +241,7 @@ export default function BankingScreen() {
                   <Text style={styles.assessText}>{results.creditRiskAssessment}</Text>
                   <View style={[styles.riskBadge, { backgroundColor: scoreColor(results.overallScore) + "30" }]}>
                     <Text style={[styles.riskText, { color: scoreColor(results.overallScore) }]}>
-                      Risk: {results.riskLevel}
+                      Risk Level: {results.riskLevel}
                     </Text>
                   </View>
                 </View>
@@ -253,8 +253,7 @@ export default function BankingScreen() {
                 </View>
               </LinearGradient>
 
-              {/* KPI grid */}
-              <View style={styles.grid}>
+              <View style={styles.badgeGrid}>
                 {([
                   ["Working Capital", results.workingCapitalPosition],
                   ["Liquidity",       results.liquidityPosition],
@@ -262,25 +261,21 @@ export default function BankingScreen() {
                   ["Creditworthiness",results.creditworthiness],
                   ["Repayment",       results.repaymentCapacity],
                   ["Stability",       results.financialStability],
+                  ["Behavior",        results.bankingBehavior],
+                  ["Risk Level",      results.riskLevel],
                 ] as const).map(([label, value]) => (
                   <StatusBadge key={label} label={label} value={value as string} />
                 ))}
               </View>
 
-              {/* Action row */}
               <View style={styles.actionRow}>
-                <TouchableOpacity
-                  style={[styles.actionBtn, { borderColor: C.primary + "60" }]}
-                  onPress={() => setSaveModal(true)}
-                >
+                <TouchableOpacity style={[styles.actionBtn, { borderColor: C.primary + "60" }]}
+                  onPress={() => setSaveModal(true)}>
                   <Feather name="save" size={16} color={C.primary} />
                   <Text style={[styles.actionBtnText, { color: C.primary }]}>Save Case</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionBtn, { borderColor: C.secondary + "60" }]}
-                  onPress={handleExportPDF}
-                  disabled={exporting}
-                >
+                <TouchableOpacity style={[styles.actionBtn, { borderColor: C.secondary + "60" }]}
+                  onPress={handleExportPDF} disabled={exporting}>
                   {exporting
                     ? <ActivityIndicator size="small" color={C.secondary} />
                     : <Feather name="download" size={16} color={C.secondary} />}
@@ -292,26 +287,21 @@ export default function BankingScreen() {
         </ScrollView>
       </PageBackground>
 
-      {/* Save Modal */}
       <Modal visible={saveModal} transparent animationType="slide" onRequestClose={() => setSaveModal(false)}>
         <View style={styles.modalOverlay}>
           <LinearGradient colors={["#1A2C42", "#111F30"]} style={styles.modalCard}>
             <Text style={styles.modalTitle}>Save Banking Case</Text>
             <TextInput
-              style={styles.modalInput}
-              placeholder="Client / Company Name"
-              placeholderTextColor="#3D5A74"
-              value={clientName}
-              onChangeText={setClientName}
-              autoFocus
+              style={styles.modalInput} placeholder="Client / Company Name"
+              placeholderTextColor="#3D5A74" value={clientName}
+              onChangeText={setClientName} autoFocus
             />
             <View style={styles.modalBtns}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSaveModal(false)}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: C.accent }]} onPress={handleSave} disabled={saving}>
-                {saving
-                  ? <ActivityIndicator size="small" color="#000" />
+                {saving ? <ActivityIndicator size="small" color="#000" />
                   : <Text style={[styles.modalSaveText, { color: "#000" }]}>Save</Text>}
               </TouchableOpacity>
             </View>
@@ -319,6 +309,18 @@ export default function BankingScreen() {
         </View>
       </Modal>
     </KeyboardAvoidingView>
+  );
+}
+
+function InputRow({ label, value, onChangeText }: { label: string; value: string; onChangeText: (v: string) => void }) {
+  return (
+    <View style={styles.inputRow}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <TextInput
+        style={styles.input} value={value} onChangeText={onChangeText}
+        keyboardType="numeric" placeholder="0" placeholderTextColor="#3D5A74" returnKeyType="done"
+      />
+    </View>
   );
 }
 
@@ -340,7 +342,10 @@ function StatusBadge({ label, value }: { label: string; value: string | undefine
 const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 16, gap: 14 },
 
-  formatChip: { fontSize: 11, color: C.success, fontFamily: "Inter_400Regular", paddingLeft: 4, marginTop: -6 },
+  sectionHint: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginBottom: 12, lineHeight: 17 },
+  metaBox: { marginTop: 10, gap: 5, backgroundColor: "#0C1826", borderRadius: 10, padding: 10 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  metaText: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular" },
 
   inputRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
   inputLabel: { flex: 1, fontSize: 12, color: "#7A9BB5", fontFamily: "Inter_400Regular" },
@@ -351,10 +356,7 @@ const styles = StyleSheet.create({
     fontSize: 13, color: "#E8F4FF", fontFamily: "Inter_500Medium",
   },
 
-  scoreCard: {
-    borderRadius: 20, padding: 20, borderWidth: 1, borderColor: "#1E3A54",
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-  },
+  scoreCard: { borderRadius: 20, padding: 20, borderWidth: 1, borderColor: "#1E3A54", flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   scoreLeft: { flex: 1, gap: 8 },
   assessLabel: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.5 },
   assessText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#E8F4FF" },
@@ -364,30 +366,20 @@ const styles = StyleSheet.create({
   scoreNum: { fontSize: 52, fontFamily: "Inter_700Bold", lineHeight: 56 },
   scoreMax: { fontSize: 12, color: "#7A9BB5", fontFamily: "Inter_400Regular", textAlign: "center" },
 
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  badge: {
-    width: "47%", flexGrow: 1, borderRadius: 16, padding: 14,
-    borderWidth: 1, borderColor: "#1E3A54", gap: 8,
-  },
+  badgeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  badge: { width: "47%", flexGrow: 1, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: "#1E3A54", gap: 8 },
   badgeLabel: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.3 },
   badgeTag: { alignSelf: "flex-start", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   badgeValue: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 
   actionRow: { flexDirection: "row", gap: 12 },
-  actionBtn: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 8, borderRadius: 14, paddingVertical: 13, borderWidth: 1,
-    backgroundColor: "#131F30",
-  },
+  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 13, borderWidth: 1, backgroundColor: "#131F30" },
   actionBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
 
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.75)", justifyContent: "flex-end" },
   modalCard: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 16, borderWidth: 1, borderColor: "#1E3A54" },
   modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#E8F4FF" },
-  modalInput: {
-    backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54",
-    paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: "#E8F4FF", fontFamily: "Inter_400Regular",
-  },
+  modalInput: { backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: "#E8F4FF", fontFamily: "Inter_400Regular" },
   modalBtns: { flexDirection: "row", gap: 12 },
   modalCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", alignItems: "center" },
   modalCancelText: { fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A9BB5" },
