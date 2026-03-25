@@ -15,7 +15,8 @@ const C = Colors.light;
 
 // ── Tab navigation order ───────────────────────────────────────────────────────
 export const TAB_ORDER: { name: string; label: string }[] = [
-  { name: "home",      label: "Dashboard" },
+  { name: "home",      label: "Home" },
+  { name: "dashboard", label: "Dashboard" },
   { name: "index",     label: "WC Analysis" },
   { name: "banking",   label: "Banking" },
   { name: "multiyear", label: "Multi-Year" },

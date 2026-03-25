@@ -22,9 +22,9 @@ export default function TabLayout() {
           borderTopWidth: 1,
           borderTopColor: "#1E3A54",
           elevation: 0,
-          height: 58,
+          height: 56,
         },
-        tabBarLabelStyle: { fontSize: 9, fontFamily: "Inter_500Medium", marginBottom: 4 },
+        tabBarLabelStyle: { fontSize: 8.5, fontFamily: "Inter_500Medium", marginBottom: 4 },
         tabBarBackground: () =>
           isIOS ? (
             <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
@@ -33,65 +33,75 @@ export default function TabLayout() {
           ),
       }}
     >
-      {/* 1. Dashboard — first screen users see */}
+      {/* 1. Home — Welcome & Navigation Hub */}
       <Tabs.Screen
         name="home"
         options={{
-          title: "Dashboard",
+          title: "Home",
           tabBarActiveTintColor: C.primary,
-          tabBarIcon: ({ color }) => <Feather name="home" size={20} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="home" size={19} color={color} />,
         }}
       />
 
-      {/* 2. Working Capital */}
+      {/* 2. Dashboard — Analytics & KPIs */}
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: "Dashboard",
+          tabBarActiveTintColor: "#20B2AA",
+          tabBarIcon: ({ color }) => <Feather name="activity" size={19} color={color} />,
+        }}
+      />
+
+      {/* 3. Working Capital */}
       <Tabs.Screen
         name="index"
         options={{
-          title: "WC Analysis",
+          title: "WC",
           tabBarActiveTintColor: "#4A9EFF",
-          tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={20} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={19} color={color} />,
         }}
       />
 
-      {/* 3. Banking */}
+      {/* 4. Banking */}
       <Tabs.Screen
         name="banking"
         options={{
           title: "Banking",
           tabBarActiveTintColor: "#D4A800",
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="bank-outline" size={20} color={color} />
+            <MaterialCommunityIcons name="bank-outline" size={19} color={color} />
           ),
         }}
       />
 
-      {/* 4. Multi-Year Analysis */}
+      {/* 5. Multi-Year Analysis */}
       <Tabs.Screen
         name="multiyear"
         options={{
-          title: "Multi-Year",
+          title: "Trend",
           tabBarActiveTintColor: "#10B981",
-          tabBarIcon: ({ color }) => <Feather name="trending-up" size={20} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="trending-up" size={19} color={color} />,
         }}
       />
 
-      {/* 5. GST & ITR */}
+      {/* 6. GST & ITR */}
       <Tabs.Screen
         name="gst-itr"
         options={{
-          title: "GST & ITR",
+          title: "GST",
           tabBarActiveTintColor: "#A855F7",
-          tabBarIcon: ({ color }) => <Feather name="file-text" size={20} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="file-text" size={19} color={color} />,
         }}
       />
 
-      {/* 6. Saved Cases */}
+      {/* 7. Saved Cases */}
       <Tabs.Screen
         name="saved"
         options={{
-          title: "Saved",
+          title: "Cases",
           tabBarActiveTintColor: "#F5832A",
-          tabBarIcon: ({ color }) => <Feather name="folder" size={20} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="folder" size={19} color={color} />,
         }}
       />
     </Tabs>

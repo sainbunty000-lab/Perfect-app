@@ -1,3 +1,8 @@
+/**
+ * Home Screen — Welcome & Navigation Hub
+ * Clean landing page: branding, feature showcase, quick start guide.
+ * No analytics here — that lives in Dashboard.
+ */
 import React from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -11,278 +16,353 @@ import { useRouter } from "expo-router";
 import { useListCases } from "@workspace/api-client-react";
 import Colors from "@/constants/colors";
 import { PageBackground, TabNavBar } from "@/components/UI";
-import { MiniSparkline, compactINR } from "@/lib/charts";
 
 const C = Colors.light;
 
+// ── Module definitions ──────────────────────────────────────────────────────
 const MODULES = [
-  { name: "index",     label: "Working Capital", icon: "bar-chart-2",   color: "#4A9EFF", desc: "BS & P&L analysis" },
-  { name: "banking",   label: "Banking",         icon: "home",          color: "#D4A800", desc: "Statement analysis" },
-  { name: "multiyear", label: "Multi-Year",      icon: "trending-up",   color: "#10B981", desc: "3-year trend charts" },
-  { name: "gst-itr",  label: "GST & ITR",        icon: "file-text",    color: "#A855F7", desc: "Compliance analysis" },
+  {
+    name: "dashboard",
+    label: "Dashboard",
+    icon: "activity",
+    color: "#20B2AA",
+    iconLib: "feather",
+    desc: "KPIs, trend charts & case analytics at a glance.",
+    badge: "Analytics",
+  },
+  {
+    name: "index",
+    label: "Working Capital",
+    icon: "bar-chart-2",
+    color: "#4A9EFF",
+    iconLib: "feather",
+    desc: "Upload Balance Sheet & P&L to calculate WC eligibility.",
+    badge: "Core Module",
+  },
+  {
+    name: "banking",
+    label: "Banking Performance",
+    icon: "bank-outline",
+    color: "#D4A800",
+    iconLib: "material",
+    desc: "Analyse bank statements, utilisation & credit limits.",
+    badge: "Core Module",
+  },
+  {
+    name: "multiyear",
+    label: "Multi-Year Analysis",
+    icon: "trending-up",
+    color: "#10B981",
+    iconLib: "feather",
+    desc: "3-year financial comparison with growth trend charts.",
+    badge: "Advanced",
+  },
+  {
+    name: "gst-itr",
+    label: "GST & ITR",
+    icon: "file-text",
+    color: "#A855F7",
+    iconLib: "feather",
+    desc: "GST returns & Income Tax filing cross-verification.",
+    badge: "Compliance",
+  },
+  {
+    name: "saved",
+    label: "Saved Cases",
+    icon: "folder",
+    color: "#F5832A",
+    iconLib: "feather",
+    desc: "Browse, search & manage all past analysis cases.",
+    badge: "Records",
+  },
 ] as const;
 
-const TYPE_LABEL: Record<string, string> = {
-  working_capital: "WC",
-  banking:         "Bank",
-  gst_itr:         "GST",
-  multi_year:      "MYr",
-};
-const TYPE_COLOR: Record<string, string> = {
-  working_capital: "#4A9EFF",
-  banking:         "#D4A800",
-  gst_itr:         "#A855F7",
-  multi_year:      "#10B981",
-};
-
-function formatDate(ts: string | number | null | undefined) {
-  if (!ts) return "—";
-  try { return new Date(ts).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }); }
-  catch { return "—"; }
-}
-
-function safeNum(v: unknown): number {
-  const n = Number(v);
-  return isFinite(n) ? n : 0;
-}
+// ── Steps ───────────────────────────────────────────────────────────────────
+const STEPS = [
+  { num: "1", text: "Select a module below", icon: "grid" },
+  { num: "2", text: "Upload your financial document", icon: "upload-cloud" },
+  { num: "3", text: "Tap Parse — AI reads it instantly", icon: "zap" },
+  { num: "4", text: "Review results & save the case", icon: "check-circle" },
+];
 
 export default function HomeScreen() {
-  const insets      = useSafeAreaInsets();
-  const tabHeight   = useBottomTabBarHeight();
-  const router      = useRouter();
-  const { width }   = useWindowDimensions();
-  const chartW      = width - 32 - 36;            // 16px padding each side + 18px card padding
+  const insets    = useSafeAreaInsets();
+  const tabHeight = useBottomTabBarHeight();
+  const router    = useRouter();
+  const { width } = useWindowDimensions();
 
-  const { data: cases, isLoading } = useListCases();
-  const caseList = cases ?? [];
-
-  // ── Derived stats ────────────────────────────────────────────────────────────
-  const total    = caseList.length;
-  const byType   = caseList.reduce<Record<string, number>>((acc, c) => {
-    const t = (c as any).caseType ?? "other";
-    acc[t] = (acc[t] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  // WC trend: last 6 WC eligibility values
-  const wcCases   = caseList.filter((c) => (c as any).caseType === "working_capital").slice(-6);
-  const wcSpark   = wcCases.map((c) => safeNum((c as any).workingCapitalResults?.eligibilityAmount));
-
-  // Banking trend: last 6 overall scores
-  const bankCases = caseList.filter((c) => (c as any).caseType === "banking").slice(-6);
-  const bankSpark = bankCases.map((c) => safeNum((c as any).bankingResults?.overallScore));
-
-  // Recent 5 cases
-  const recent = [...caseList].sort((a, b) => {
-    const ta = new Date((a as any).createdAt ?? 0).getTime();
-    const tb = new Date((b as any).createdAt ?? 0).getTime();
-    return tb - ta;
-  }).slice(0, 5);
+  const { data: cases } = useListCases();
+  const total = (cases ?? []).length;
 
   const goTo = (name: string) => {
     if (name === "index") router.push("/(tabs)/");
     else router.push(`/(tabs)/${name}` as any);
   };
 
+  const cardWidth = (width - 32 - 12) / 2; // 16px side padding each + 12px gap
+
   return (
     <PageBackground>
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingTop: insets.top + 16, paddingBottom: tabHeight + 24 },
+          { paddingTop: insets.top + 12, paddingBottom: tabHeight + 28 },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Hero Header ───────────────────────────────────────── */}
+        {/* ── Hero Banner ──────────────────────────────────────────── */}
         <LinearGradient
-          colors={["#0D2137", "#0A1628"]}
+          colors={["#0B2540", "#0A1628", "#071220"]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={styles.hero}
         >
-          <LinearGradient
-            colors={[C.primary + "30", "transparent"]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <Text style={styles.brand}>DHANUSH ENTERPRISES</Text>
-          <Text style={styles.heroTitle}>Financial{"\n"}Intelligence</Text>
-          <Text style={styles.heroSub}>
-            {isLoading ? "Loading…" : `${total} case${total !== 1 ? "s" : ""} analysed`}
+          {/* Decorative top-right glow */}
+          <View style={styles.heroGlow} />
+
+          <View style={styles.heroLogoRow}>
+            <LinearGradient
+              colors={[C.primary, "#0EA5A0"]}
+              style={styles.heroLogoCircle}
+            >
+              <MaterialCommunityIcons name="finance" size={26} color="#fff" />
+            </LinearGradient>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.brand}>DHANUSH ENTERPRISES</Text>
+              <Text style={styles.brandSub}>Financial Intelligence Platform</Text>
+            </View>
+          </View>
+
+          <Text style={styles.heroHeadline}>
+            Smart Analysis.{"\n"}Instant Results.
           </Text>
+          <Text style={styles.heroBody}>
+            AI-powered document parsing — upload any Balance Sheet, P&L, Bank Statement, GST return, or ITR and get structured financials in seconds.
+          </Text>
+
+          <View style={styles.heroStats}>
+            <StatPill icon="folder" label={`${total} Case${total !== 1 ? "s" : ""} Saved`} color={C.primary} />
+            <StatPill icon="zap"    label="AI-Powered OCR"    color="#F5C842" />
+            <StatPill icon="shield" label="100% Accurate"     color="#10B981" />
+          </View>
         </LinearGradient>
 
-        {/* ── Summary KPI row ────────────────────────────────────── */}
-        <View style={styles.kpiRow}>
-          <KpiCard label="Total Cases" value={String(total)} icon="folder" color={C.primary} />
-          <KpiCard label="WC Cases"    value={String(byType["working_capital"] ?? 0)} icon="bar-chart-2" color="#4A9EFF" />
-          <KpiCard label="Banking"     value={String(byType["banking"] ?? 0)} icon="credit-card" color="#D4A800" />
-          <KpiCard label="Multi-Yr"    value={String(byType["multi_year"] ?? 0)} icon="trending-up" color="#10B981" />
+        {/* ── How it works ─────────────────────────────────────────── */}
+        <View style={styles.sectionHeader}>
+          <View style={[styles.sectionLine, { backgroundColor: C.primary + "60" }]} />
+          <Text style={styles.sectionTitle}>HOW IT WORKS</Text>
+          <View style={[styles.sectionLine, { backgroundColor: C.primary + "60" }]} />
         </View>
 
-        {/* ── WC Eligibility Trend ───────────────────────────────── */}
-        {wcSpark.length >= 2 && (
-          <LinearGradient colors={["#1A2C42", "#152236"]} style={styles.chartCard}>
-            <View style={styles.chartHeader}>
-              <View>
-                <Text style={styles.chartTitle}>WC Eligibility Trend</Text>
-                <Text style={styles.chartSub}>Last {wcSpark.length} working capital cases</Text>
-              </View>
-              <Text style={[styles.chartLatest, { color: "#4A9EFF" }]}>
-                {compactINR(wcSpark[wcSpark.length - 1])}
-              </Text>
-            </View>
-            <MiniSparkline values={wcSpark} color="#4A9EFF" width={chartW} height={56} />
-          </LinearGradient>
-        )}
-
-        {/* ── Banking Score Trend ────────────────────────────────── */}
-        {bankSpark.length >= 2 && (
-          <LinearGradient colors={["#1A2C42", "#152236"]} style={styles.chartCard}>
-            <View style={styles.chartHeader}>
-              <View>
-                <Text style={styles.chartTitle}>Banking Score Trend</Text>
-                <Text style={styles.chartSub}>Last {bankSpark.length} banking analyses</Text>
-              </View>
-              <Text style={[styles.chartLatest, { color: "#D4A800" }]}>
-                {bankSpark[bankSpark.length - 1].toFixed(0)}/100
-              </Text>
-            </View>
-            <MiniSparkline values={bankSpark} color="#D4A800" width={chartW} height={56} />
-          </LinearGradient>
-        )}
-
-        {/* ── Module Quick Actions ───────────────────────────────── */}
-        <Text style={styles.sectionLabel}>Quick Actions</Text>
-        <View style={styles.moduleGrid}>
-          {MODULES.map((m) => (
-            <TouchableOpacity key={m.name} onPress={() => goTo(m.name)} activeOpacity={0.8} style={{ width: "48%" }}>
+        <LinearGradient colors={["#101E30", "#0C1828"]} style={styles.stepsCard}>
+          {STEPS.map((s, i) => (
+            <View key={s.num} style={styles.stepRow}>
               <LinearGradient
-                colors={[m.color + "22", m.color + "0A"]}
-                style={[styles.moduleCard, { borderColor: m.color + "44" }]}
+                colors={[C.primary + "30", C.primary + "10"]}
+                style={styles.stepNumBubble}
               >
-                <View style={[styles.moduleIcon, { backgroundColor: m.color + "22" }]}>
-                  <Feather name={m.icon as any} size={20} color={m.color} />
+                <Text style={styles.stepNum}>{s.num}</Text>
+              </LinearGradient>
+              <Feather name={s.icon as any} size={16} color={C.primary} style={styles.stepIcon} />
+              <Text style={styles.stepText}>{s.text}</Text>
+              {i < STEPS.length - 1 && <View style={styles.stepDivider} />}
+            </View>
+          ))}
+        </LinearGradient>
+
+        {/* ── Modules Grid ─────────────────────────────────────────── */}
+        <View style={styles.sectionHeader}>
+          <View style={[styles.sectionLine, { backgroundColor: "#4A9EFF60" }]} />
+          <Text style={styles.sectionTitle}>MODULES</Text>
+          <View style={[styles.sectionLine, { backgroundColor: "#4A9EFF60" }]} />
+        </View>
+
+        <View style={styles.grid}>
+          {MODULES.map((m) => (
+            <TouchableOpacity
+              key={m.name}
+              style={{ width: cardWidth }}
+              onPress={() => goTo(m.name)}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[m.color + "1C", m.color + "08", "#0A1628"]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={styles.moduleCard}
+              >
+                {/* Top border accent */}
+                <View style={[styles.cardAccent, { backgroundColor: m.color }]} />
+
+                {/* Badge */}
+                <View style={[styles.badge, { backgroundColor: m.color + "22" }]}>
+                  <Text style={[styles.badgeText, { color: m.color }]}>{m.badge}</Text>
                 </View>
+
+                {/* Icon */}
+                <LinearGradient
+                  colors={[m.color + "30", m.color + "14"]}
+                  style={styles.iconWrap}
+                >
+                  {m.iconLib === "material" ? (
+                    <MaterialCommunityIcons name={m.icon as any} size={22} color={m.color} />
+                  ) : (
+                    <Feather name={m.icon as any} size={22} color={m.color} />
+                  )}
+                </LinearGradient>
+
                 <Text style={styles.moduleLabel}>{m.label}</Text>
                 <Text style={styles.moduleDesc}>{m.desc}</Text>
-                <View style={[styles.moduleArrow, { backgroundColor: m.color + "22" }]}>
-                  <Feather name="arrow-right" size={12} color={m.color} />
+
+                {/* CTA row */}
+                <View style={styles.cardCTA}>
+                  <Text style={[styles.ctaText, { color: m.color }]}>Open</Text>
+                  <Feather name="arrow-right" size={11} color={m.color} />
                 </View>
               </LinearGradient>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* ── Recent Cases ───────────────────────────────────────── */}
-        <Text style={styles.sectionLabel}>Recent Cases</Text>
-        {recent.length === 0 ? (
-          <LinearGradient colors={["#1A2C42", "#152236"]} style={styles.emptyCard}>
-            <Feather name="inbox" size={28} color="#2A4A65" />
-            <Text style={styles.emptyText}>No cases yet</Text>
-            <Text style={styles.emptySub}>Upload a document in any module to get started</Text>
+        {/* ── Key capabilities ─────────────────────────────────────── */}
+        <View style={styles.sectionHeader}>
+          <View style={[styles.sectionLine, { backgroundColor: "#A855F760" }]} />
+          <Text style={styles.sectionTitle}>CAPABILITIES</Text>
+          <View style={[styles.sectionLine, { backgroundColor: "#A855F760" }]} />
+        </View>
+
+        <LinearGradient colors={["#101E30", "#0C1828"]} style={styles.capsCard}>
+          {[
+            { icon: "cpu",        color: "#20B2AA", text: "Google Vision OCR — reads any scanned PDF or image" },
+            { icon: "zap",        color: "#F5C842", text: "Gemini AI extracts 15+ structured financial fields" },
+            { icon: "trending-up",color: "#10B981", text: "Multi-year growth trend charts with sparklines" },
+            { icon: "shield",     color: "#4A9EFF", text: "All data stored locally — 100% private & secure" },
+            { icon: "download",   color: "#A855F7", text: "Export analysis reports as PDF" },
+          ].map((cap, i) => (
+            <View key={i} style={styles.capRow}>
+              <View style={[styles.capDot, { backgroundColor: cap.color }]} />
+              <Feather name={cap.icon as any} size={15} color={cap.color} />
+              <Text style={styles.capText}>{cap.text}</Text>
+            </View>
+          ))}
+        </LinearGradient>
+
+        {/* ── Primary CTA ──────────────────────────────────────────── */}
+        <TouchableOpacity onPress={() => goTo("index")} activeOpacity={0.85}>
+          <LinearGradient
+            colors={[C.primary, "#0EA5A0", "#0D8F8A"]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={styles.cta}
+          >
+            <Feather name="upload-cloud" size={18} color="#fff" />
+            <Text style={styles.ctaMain}>Start New Analysis</Text>
+            <Feather name="chevron-right" size={18} color="#fff" />
           </LinearGradient>
-        ) : (
-          recent.map((c, i) => {
-            const type   = (c as any).caseType ?? "other";
-            const color  = TYPE_COLOR[type] ?? C.primary;
-            const badge  = TYPE_LABEL[type] ?? type;
-            const name   = (c as any).clientName ?? "Unnamed";
-            const date   = formatDate((c as any).createdAt);
+        </TouchableOpacity>
 
-            // Pull a highlight value
-            let highlight = "";
-            if (type === "working_capital") {
-              const e = safeNum((c as any).workingCapitalResults?.eligibilityAmount);
-              if (e) highlight = `Eligible: ${compactINR(e)}`;
-            } else if (type === "banking") {
-              const s = safeNum((c as any).bankingResults?.overallScore);
-              if (s) highlight = `Score: ${s}/100`;
-            }
-
-            return (
-              <LinearGradient key={(c as any).id ?? i} colors={["#1A2C42", "#152236"]} style={styles.caseCard}>
-                <View style={[styles.caseBadge, { backgroundColor: color + "22" }]}>
-                  <Text style={[styles.caseBadgeText, { color }]}>{badge}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.caseName} numberOfLines={1}>{name}</Text>
-                  {highlight ? <Text style={[styles.caseHighlight, { color }]}>{highlight}</Text> : null}
-                </View>
-                <Text style={styles.caseDate}>{date}</Text>
-              </LinearGradient>
-            );
-          })
-        )}
-
-        {recent.length > 0 && (
-          <TouchableOpacity style={styles.viewAllBtn} onPress={() => goTo("saved")} activeOpacity={0.8}>
-            <Text style={styles.viewAllText}>View All Cases</Text>
-            <Feather name="arrow-right" size={14} color={C.primary} />
-          </TouchableOpacity>
-        )}
-
-        {/* ── Next / Back nav ────────────────────────────────────── */}
         <TabNavBar current="home" />
       </ScrollView>
     </PageBackground>
   );
 }
 
-function KpiCard({ label, value, icon, color }: { label: string; value: string; icon: string; color: string }) {
+// ── Small helper components ─────────────────────────────────────────────────
+function StatPill({ icon, label, color }: { icon: string; label: string; color: string }) {
   return (
-    <LinearGradient colors={[color + "18", color + "08"]} style={[styles.kpi, { borderColor: color + "33" }]}>
-      <Feather name={icon as any} size={14} color={color} />
-      <Text style={[styles.kpiVal, { color }]}>{value}</Text>
-      <Text style={styles.kpiLabel}>{label}</Text>
-    </LinearGradient>
+    <View style={[styles.pill, { borderColor: color + "40", backgroundColor: color + "14" }]}>
+      <Feather name={icon as any} size={11} color={color} />
+      <Text style={[styles.pillText, { color }]}>{label}</Text>
+    </View>
   );
 }
 
+// ── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 16, gap: 14 },
+  scroll: { paddingHorizontal: 16, gap: 16 },
 
   // Hero
-  hero: { borderRadius: 24, padding: 24, overflow: "hidden", borderWidth: 1, borderColor: "#1E3A54" },
-  brand: { fontSize: 9, fontFamily: "Inter_700Bold", color: C.primary, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 10 },
-  heroTitle: { fontSize: 34, fontFamily: "Inter_700Bold", color: "#E8F4FF", lineHeight: 40, letterSpacing: -0.5 },
-  heroSub: { fontSize: 13, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 10 },
+  hero: {
+    borderRadius: 24, padding: 22, overflow: "hidden",
+    borderWidth: 1, borderColor: "#1E3A54", gap: 14,
+  },
+  heroGlow: {
+    position: "absolute", top: -40, right: -40,
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: "#20B2AA18",
+  },
+  heroLogoRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  heroLogoCircle: {
+    width: 50, height: 50, borderRadius: 14,
+    alignItems: "center", justifyContent: "center",
+  },
+  brand: {
+    fontSize: 10, fontFamily: "Inter_700Bold", color: C.primary,
+    letterSpacing: 2.2, textTransform: "uppercase",
+  },
+  brandSub: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 2 },
+  heroHeadline: {
+    fontSize: 30, fontFamily: "Inter_700Bold", color: "#E8F4FF",
+    lineHeight: 36, letterSpacing: -0.5,
+  },
+  heroBody: {
+    fontSize: 13, color: "#8BAFC9", fontFamily: "Inter_400Regular", lineHeight: 20,
+  },
+  heroStats: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  pill: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
+  },
+  pillText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
 
-  // KPI row
-  kpiRow: { flexDirection: "row", gap: 8 },
-  kpi: { flex: 1, borderRadius: 14, borderWidth: 1, alignItems: "center", paddingVertical: 12, paddingHorizontal: 4, gap: 4 },
-  kpiVal: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  kpiLabel: { fontSize: 9, color: "#7A9BB5", fontFamily: "Inter_500Medium", textAlign: "center" },
+  // Section headers
+  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+  sectionLine: { flex: 1, height: 1 },
+  sectionTitle: {
+    fontSize: 10, fontFamily: "Inter_700Bold", color: "#5A7A94",
+    letterSpacing: 2, textTransform: "uppercase",
+  },
 
-  // Charts
-  chartCard: { borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54", padding: 16, gap: 10 },
-  chartHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  chartTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#C8DDF0" },
-  chartSub: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 2 },
-  chartLatest: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  // How-it-works card
+  stepsCard: { borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54", padding: 18, gap: 0 },
+  stepRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, position: "relative" },
+  stepNumBubble: {
+    width: 30, height: 30, borderRadius: 10,
+    alignItems: "center", justifyContent: "center",
+  },
+  stepNum: { fontSize: 13, fontFamily: "Inter_700Bold", color: C.primary },
+  stepIcon: { marginLeft: -4 },
+  stepText: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: "#B0CCE0" },
+  stepDivider: {
+    position: "absolute", left: 14, bottom: 0,
+    width: 2, height: 2, borderRadius: 1, backgroundColor: "#1E3A54",
+  },
 
-  // Modules
-  sectionLabel: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#7A9BB5", textTransform: "uppercase", letterSpacing: 1.2, marginTop: 4 },
-  moduleGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  moduleCard: { borderRadius: 18, borderWidth: 1, padding: 16, gap: 8, overflow: "hidden" },
-  moduleIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  moduleLabel: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#E8F4FF" },
-  moduleDesc: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_400Regular" },
-  moduleArrow: { alignSelf: "flex-start", width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  // Modules grid
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  moduleCard: {
+    borderRadius: 20, borderWidth: 1, borderColor: "#1E3A5450",
+    padding: 14, gap: 8, overflow: "hidden", position: "relative",
+  },
+  cardAccent: { position: "absolute", top: 0, left: 0, right: 0, height: 3, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  badge: { alignSelf: "flex-start", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  badgeText: { fontSize: 9, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.8 },
+  iconWrap: {
+    width: 46, height: 46, borderRadius: 14,
+    alignItems: "center", justifyContent: "center",
+  },
+  moduleLabel: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#E0EDF8", lineHeight: 17 },
+  moduleDesc: { fontSize: 10.5, color: "#6A8FA8", fontFamily: "Inter_400Regular", lineHeight: 15 },
+  cardCTA: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  ctaText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
 
-  // Recent cases
-  caseCard: { borderRadius: 16, borderWidth: 1, borderColor: "#1E3A54", padding: 14, flexDirection: "row", alignItems: "center", gap: 12 },
-  caseBadge: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  caseBadgeText: { fontSize: 10, fontFamily: "Inter_700Bold" },
-  caseName: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#E8F4FF" },
-  caseHighlight: { fontSize: 11, fontFamily: "Inter_500Medium", marginTop: 2 },
-  caseDate: { fontSize: 10, color: "#4A6A84", fontFamily: "Inter_400Regular" },
+  // Capabilities
+  capsCard: { borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54", padding: 18, gap: 14 },
+  capRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  capDot: { width: 4, height: 4, borderRadius: 2 },
+  capText: { flex: 1, fontSize: 12.5, fontFamily: "Inter_400Regular", color: "#9BBDD4", lineHeight: 18 },
 
-  // Empty state
-  emptyCard: { borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54", padding: 32, alignItems: "center", gap: 8 },
-  emptyText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#3D5A74" },
-  emptySub: { fontSize: 12, color: "#2A3D52", fontFamily: "Inter_400Regular", textAlign: "center" },
-
-  // View all
-  viewAllBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 4 },
-  viewAllText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: C.primary },
+  // CTA button
+  cta: {
+    borderRadius: 18, paddingVertical: 16, paddingHorizontal: 24,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+  },
+  ctaMain: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff", flex: 1, textAlign: "center" },
 });

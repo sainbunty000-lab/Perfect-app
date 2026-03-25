@@ -1,14 +1,15 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
-import { execFile } from "child_process";
-import { promisify } from "util";
-import { writeFile, unlink } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
-import { randomBytes } from "crypto";
-import { parseFinancialDocument, type DocType } from "../lib/financialParser";
+import { GoogleGenAI } from "@google/genai";
 
-const execFileAsync = promisify(execFile);
+const geminiBaseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+const geminiApiKey  = process.env.AI_INTEGRATIONS_GEMINI_API_KEY ?? "placeholder";
+
+const ai = new GoogleGenAI({
+  apiKey: geminiApiKey,
+  ...(geminiBaseUrl ? { httpOptions: { apiVersion: "", baseUrl: geminiBaseUrl } } : {}),
+});
+
 const router: IRouter = Router();
 
 const upload = multer({
@@ -87,124 +88,242 @@ async function visionOcrPdf(buffer: Buffer): Promise<string> {
       if (t.trim()) allTexts.push(t);
     }
 
-    // Fewer pages returned than requested → we've reached the end
     if (pageResponses.length < 5) break;
   }
 
   return allTexts.join("\n\n");
 }
 
-// ── Local pdftotext (text-based PDFs) ────────────────────────────────────────
+// ── Extract raw text from any file format ─────────────────────────────────────
+// PDFs → always Google Vision (handles both digital and scanned)
+// Images → Google Vision
+// Excel/CSV → XLSX library (cell-accurate)
 
-async function localPdfToText(buffer: Buffer): Promise<string> {
-  const tmpFile = join(tmpdir(), `parse-${randomBytes(8).toString("hex")}.pdf`);
-  try {
-    await writeFile(tmpFile, buffer);
-    let stdout = "";
-    try {
-      const result = await execFileAsync("pdftotext", ["-layout", tmpFile, "-"], {
-        maxBuffer: 10 * 1024 * 1024,
-      });
-      stdout = result.stdout ?? "";
-    } catch (err: any) {
-      stdout = err?.stdout ?? "";
+async function extractRawText(
+  buffer: Buffer,
+  mimetype: string,
+  filename: string,
+): Promise<{ text: string; format: string }> {
+  const fn = filename.toLowerCase();
+
+  const isPdf   = fn.endsWith(".pdf") || mimetype === "application/pdf";
+  const isExcel = fn.endsWith(".xlsx") || fn.endsWith(".xls") ||
+                  mimetype.includes("spreadsheet") || mimetype.includes("excel");
+  const isImage = mimetype.startsWith("image/") ||
+                  /\.(jpg|jpeg|png|webp|tiff|bmp)$/.test(fn);
+
+  if (isPdf) {
+    const text = await visionOcrPdf(buffer);
+    return { text, format: "pdf" };
+  }
+
+  if (isExcel) {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.read(buffer, { type: "buffer" });
+    const parts: string[] = [];
+    for (const sn of wb.SheetNames) {
+      const csv = XLSX.utils.sheet_to_csv(wb.Sheets[sn], { blankrows: false });
+      if (csv.trim()) parts.push(`--- Sheet: ${sn} ---\n${csv}`);
     }
-    return stdout;
-  } finally {
-    await unlink(tmpFile).catch(() => {});
+    return { text: parts.join("\n\n"), format: "excel" };
+  }
+
+  if (isImage) {
+    const text = await visionOcrImage(buffer, mimetype || "image/jpeg");
+    return { text, format: "image" };
+  }
+
+  return { text: buffer.toString("utf-8"), format: "text" };
+}
+
+// ── Gemini AI field extraction ────────────────────────────────────────────────
+// Replaces all regex parsing. Gemini understands Indian financial document
+// formats, layouts, terminology, and number conventions natively.
+
+type DocType = "balance_sheet" | "profit_loss" | "banking" | "gstr" | "itr";
+
+function buildFieldSchema(docType: DocType): string {
+  switch (docType) {
+    case "balance_sheet":
+      return `{
+  "totalCurrentAssets": number | null,
+  "totalCurrentLiabilities": number | null,
+  "inventory": number | null,
+  "debtors": number | null,
+  "cashAndBank": number | null,
+  "fixedAssets": number | null,
+  "totalAssets": number | null,
+  "netWorth": number | null,
+  "longTermLoans": number | null,
+  "shortTermLoans": number | null,
+  "bankOD": number | null,
+  "sundryCreditors": number | null,
+  "otherCurrentLiabilities": number | null,
+  "investments": number | null,
+  "loansAndAdvances": number | null,
+  "totalLiabilities": number | null
+}`;
+
+    case "profit_loss":
+      return `{
+  "grossSales": number | null,
+  "netSales": number | null,
+  "costOfGoodsSold": number | null,
+  "grossProfit": number | null,
+  "operatingExpenses": number | null,
+  "EBITDA": number | null,
+  "depreciation": number | null,
+  "EBIT": number | null,
+  "interestExpenses": number | null,
+  "netProfit": number | null,
+  "otherIncome": number | null,
+  "totalIncome": number | null,
+  "totalExpenses": number | null,
+  "tax": number | null
+}`;
+
+    case "banking":
+      return `{
+  "bankName": string | null,
+  "accountType": string | null,
+  "sanctionedLimit": number | null,
+  "outstandingBalance": number | null,
+  "utilization": number | null,
+  "dpValue": number | null,
+  "securityValue": number | null,
+  "creditRating": string | null,
+  "interestRate": number | null,
+  "tenure": string | null,
+  "emiAmount": number | null,
+  "npaStatus": string | null,
+  "overdraftLimit": number | null,
+  "cashCreditLimit": number | null,
+  "termLoanOutstanding": number | null
+}`;
+
+    case "gstr":
+      return `{
+  "gstinNumber": string | null,
+  "filingPeriod": string | null,
+  "totalTaxableValue": number | null,
+  "totalIGST": number | null,
+  "totalCGST": number | null,
+  "totalSGST": number | null,
+  "totalTax": number | null,
+  "totalInvoices": number | null,
+  "b2bTaxableValue": number | null,
+  "b2cTaxableValue": number | null,
+  "exportValue": number | null,
+  "inputTaxCredit": number | null,
+  "netTaxPayable": number | null
+}`;
+
+    case "itr":
+      return `{
+  "assessmentYear": string | null,
+  "panNumber": string | null,
+  "grossTotalIncome": number | null,
+  "deductions": number | null,
+  "netTaxableIncome": number | null,
+  "taxPayable": number | null,
+  "taxPaid": number | null,
+  "refundAmount": number | null,
+  "salaryIncome": number | null,
+  "businessIncome": number | null,
+  "capitalGains": number | null,
+  "otherIncome": number | null,
+  "housePropertyIncome": number | null
+}`;
   }
 }
 
-// ── Main PDF extraction strategy ──────────────────────────────────────────────
-// 1. Try pdftotext (fast, great for digital PDFs)
-// 2. If result is thin (< 120 meaningful chars) → scanned PDF → use Vision API
+function buildGeminiPrompt(text: string, docType: DocType): string {
+  const schema = buildFieldSchema(docType);
+  const docLabel: Record<DocType, string> = {
+    balance_sheet: "Balance Sheet (Schedule VI / IND-AS format, possibly in lakhs or crores)",
+    profit_loss:   "Profit & Loss Statement / Trading Account",
+    banking:       "Banking Statement / Credit Facility / Sanction Letter",
+    gstr:          "GST Return (GSTR-1 / GSTR-3B / GSTR-9)",
+    itr:           "Income Tax Return (ITR-1 / ITR-2 / ITR-3 / ITR-4 or Computation Sheet)",
+  };
 
-async function extractPdfText(buffer: Buffer): Promise<string> {
-  const localText = await localPdfToText(buffer);
+  return `You are an expert Indian financial document parser with deep knowledge of Indian accounting standards (Schedule VI, IND-AS), GST regulations, and Income Tax rules.
 
-  // If pdftotext extracted enough text, use it
-  const meaningful = localText.replace(/\s+/g, " ").trim();
-  if (meaningful.length >= 120) return localText;
+DOCUMENT TYPE: ${docLabel[docType]}
 
-  // Otherwise fall back to Google Cloud Vision (handles scanned / image PDFs)
+TASK: Extract financial values from the document text below and return ONLY a valid JSON object matching the exact schema provided. 
+
+RULES:
+1. Return ONLY the JSON object — no explanation, no markdown, no code fences.
+2. All monetary values must be plain numbers (not strings). Convert Indian number formats: 1,43,827 → 143827. Convert lakhs/crores if units are stated (e.g. "₹ in Lakhs" means multiply each value by 100000).
+3. If a value appears in parentheses like (15,000) it means negative → -15000.
+4. If a field is genuinely not present in the document, use null.
+5. For percentage fields (utilization, interestRate), return the number only (e.g. 75.5 not "75.5%").
+6. Look for these Indian accounting terms:
+   - "Sundry Debtors" or "Trade Receivables" = debtors
+   - "Closing Stock" or "Stock-in-Trade" or "Inventories" = inventory
+   - "Cash & Cash Equivalents" or "Cash and Bank" = cashAndBank
+   - "Sundry Creditors" or "Trade Payables" = sundryCreditors
+   - "Bank Overdraft" or "CC Account" or "Cash Credit" = bankOD
+   - "Secured Loans" or "Term Loans from Banks" = longTermLoans
+   - "Net Profit After Tax" or "PAT" = netProfit
+   - "Gross Profit" = grossSales minus costOfGoodsSold
+   - "EBITDA" = Earnings Before Interest, Tax, Depreciation, Amortisation
+   - "Capital Account" or "Partners Capital" or "Equity Share Capital + Reserves" = netWorth
+7. The document may be in horizontal (two-column) or vertical layout — handle both correctly.
+8. Numbers may use Indian comma formatting: 1,00,000 = 100000 (one lakh).
+
+SCHEMA TO FILL:
+${schema}
+
+DOCUMENT TEXT:
+${text.slice(0, 15000)}`;
+}
+
+async function geminiExtractFields(text: string, docType: DocType): Promise<Record<string, any>> {
+  const prompt = buildGeminiPrompt(text, docType);
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    config: {
+      maxOutputTokens: 8192,
+      responseMimeType: "application/json",
+    },
+  });
+
+  const raw = response.text ?? "{}";
+
+  // Strip any accidental markdown fences
+  const cleaned = raw.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+
   try {
-    return await visionOcrPdf(buffer);
-  } catch (visionErr) {
-    // Vision failed — return whatever local extraction we got
-    return localText;
+    return JSON.parse(cleaned);
+  } catch {
+    // Try to extract JSON from partial response
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) {
+      try { return JSON.parse(match[0]); } catch {}
+    }
+    return {};
   }
 }
 
-// ── Route ─────────────────────────────────────────────────────────────────────
+// ── Routes ────────────────────────────────────────────────────────────────────
 
+// /api/parse-document — raw text extraction only (no field parsing)
 router.post("/parse-document", upload.single("file"), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ message: "No file uploaded" });
     return;
   }
 
-  const { buffer, mimetype, originalname } = req.file;
-  const filename = (originalname ?? "").toLowerCase();
-
   try {
-    let text = "";
-    let format = "text";
-
-    const isPdf =
-      filename.endsWith(".pdf") || mimetype === "application/pdf";
-    const isExcel =
-      filename.endsWith(".xlsx") ||
-      filename.endsWith(".xls") ||
-      mimetype.includes("spreadsheet") ||
-      mimetype.includes("excel");
-    const isImage =
-      mimetype.startsWith("image/") ||
-      filename.endsWith(".jpg") ||
-      filename.endsWith(".jpeg") ||
-      filename.endsWith(".png") ||
-      filename.endsWith(".webp") ||
-      filename.endsWith(".tiff") ||
-      filename.endsWith(".bmp");
-
-    if (isPdf) {
-      format = "pdf";
-      text = await extractPdfText(buffer);
-
-    } else if (isExcel) {
-      format = "excel";
-      const XLSX = await import("xlsx");
-      const workbook = XLSX.read(buffer, { type: "buffer" });
-      const parts: string[] = [];
-      for (const sheetName of workbook.SheetNames) {
-        const sheet = workbook.Sheets[sheetName];
-        const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
-        if (csv.trim()) parts.push(`--- Sheet: ${sheetName} ---\n${csv}`);
-      }
-      text = parts.join("\n\n");
-
-    } else if (isImage) {
-      format = "image";
-      // Always use Vision API for images — far more accurate than Tesseract
-      try {
-        text = await visionOcrImage(buffer, mimetype || "image/jpeg");
-      } catch {
-        // Fallback to local Tesseract if Vision fails
-        try {
-          const { createWorker } = await import("tesseract.js");
-          const worker = await createWorker("eng", 1, { logger: () => {} });
-          const { data } = await worker.recognize(buffer);
-          text = data.text ?? "";
-          await worker.terminate();
-        } catch {
-          text = "";
-        }
-      }
-
-    } else {
-      format = "text";
-      text = buffer.toString("utf-8");
-    }
-
+    const { text, format } = await extractRawText(
+      req.file.buffer,
+      req.file.mimetype,
+      req.file.originalname ?? "",
+    );
     res.json({ text, format });
   } catch (err) {
     req.log.error({ err }, "parse-document failed");
@@ -212,62 +331,38 @@ router.post("/parse-document", upload.single("file"), async (req, res) => {
   }
 });
 
-// ── /api/parse-financial ──────────────────────────────────────────────────────
-// Accepts a file + docType, extracts text, then runs the structured parser.
-// Returns { text, format, fields } — fields is fully structured financial data.
-
+// /api/parse-financial — full pipeline: Vision OCR → Gemini AI field extraction
 router.post("/parse-financial", upload.single("file"), async (req, res) => {
-  if (!req.file) { res.status(400).json({ message: "No file uploaded" }); return; }
+  if (!req.file) {
+    res.status(400).json({ message: "No file uploaded" });
+    return;
+  }
 
   const docType = (req.body?.docType ?? "") as DocType;
   const validTypes: DocType[] = ["balance_sheet", "profit_loss", "banking", "gstr", "itr"];
   if (!validTypes.includes(docType)) {
-    res.status(400).json({ message: `Invalid docType. Must be one of: ${validTypes.join(", ")}` });
+    res.status(400).json({
+      message: `Invalid docType. Must be one of: ${validTypes.join(", ")}`,
+    });
     return;
   }
 
-  const { buffer, mimetype, originalname } = req.file;
-  const filename = (originalname ?? "").toLowerCase();
-
   try {
-    let text = "";
-    let format = "text";
+    // Step 1: Extract raw text using Google Vision (or XLSX for Excel)
+    const { text, format } = await extractRawText(
+      req.file.buffer,
+      req.file.mimetype,
+      req.file.originalname ?? "",
+    );
 
-    const isPdf   = filename.endsWith(".pdf") || mimetype === "application/pdf";
-    const isExcel = filename.endsWith(".xlsx") || filename.endsWith(".xls") || mimetype.includes("spreadsheet") || mimetype.includes("excel");
-    const isImage = mimetype.startsWith("image/") || /\.(jpg|jpeg|png|webp|tiff|bmp)$/.test(filename);
-
-    if (isPdf) {
-      format = "pdf";
-      text = await extractPdfText(buffer);
-    } else if (isExcel) {
-      format = "excel";
-      const XLSX = await import("xlsx");
-      const wb = XLSX.read(buffer, { type: "buffer" });
-      const parts: string[] = [];
-      for (const sn of wb.SheetNames) {
-        const csv = XLSX.utils.sheet_to_csv(wb.Sheets[sn], { blankrows: false });
-        if (csv.trim()) parts.push(`--- Sheet: ${sn} ---\n${csv}`);
-      }
-      text = parts.join("\n\n");
-    } else if (isImage) {
-      format = "image";
-      try { text = await visionOcrImage(buffer, mimetype || "image/jpeg"); }
-      catch {
-        try {
-          const { createWorker } = await import("tesseract.js");
-          const worker = await createWorker("eng", 1, { logger: () => {} });
-          const { data } = await worker.recognize(buffer);
-          text = data.text ?? "";
-          await worker.terminate();
-        } catch { text = ""; }
-      }
-    } else {
-      format = "text";
-      text = buffer.toString("utf-8");
+    if (!text.trim()) {
+      res.status(422).json({ message: "Could not extract any text from the document. Please ensure the file is readable." });
+      return;
     }
 
-    const fields = parseFinancialDocument(text, docType);
+    // Step 2: Use Gemini AI to extract structured fields from raw text
+    const fields = await geminiExtractFields(text, docType);
+
     res.json({ text, format, fields });
 
   } catch (err) {
