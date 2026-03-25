@@ -67,7 +67,10 @@ function parseIndianNumber(raw: string): number | null {
 }
 
 function extractNumbers(text: string): number[] {
-  const pattern = /\([\d,]+(?:\.\d+)?\)|-?[\d,]+(?:\.\d+)?/g;
+  // Matches: (1,43,827) for negatives  OR  1,43,827  or  1,43,827.00
+  // Does NOT use leading minus sign — Indian documents use parentheses for negatives.
+  // This avoids false matches in date strings like "31-03-2024" (where -03 is a date separator)
+  const pattern = /\([\d,]+(?:\.\d+)?\)|[\d,]+(?:\.\d+)?/g;
   const results: number[] = [];
   let m: RegExpExecArray | null;
   while ((m = pattern.exec(text)) !== null) {
@@ -172,18 +175,21 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
   // ── BALANCE SHEET FIELDS ──────────────────────────────────────────────────
 
   // --- Individual components (always computed for the sum approach) ---
+
+  // Cash & Bank — exclude overdraft/OD lines which are liabilities, not assets
   const compCash = findValue([
     "bank and cash balance", "bank and cash balances",
     "cash and bank balance", "cash and bank balances", "cash and bank",
     "cash & bank", "cash and cash equivalents",
     "balance with bank", "bank balance", "cash in hand", "cash balance",
-  ]);
+  ], false, ["overdraft", "od limit", "cc limit", "od balance", "cash credit"]);
 
+  // Debtors — exclude bad debt provisions which are contra-items
   const compDebtors = findValue([
     "sundry debtors", "trade debtors", "trade receivables",
     "accounts receivable", "book debts",
     "debtors",
-  ], false, ["bad debts", "provision for doubtful", "doubtful"]);
+  ], false, ["bad debts", "provision for doubtful", "doubtful", "creditors"]);
 
   const compInventory = findValue([
     "closing stock", "closing inventory", "stock-in-trade",
@@ -191,11 +197,12 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
     "raw material stock", "wip stock",
   ]);
 
+  // Advances / Other CA — exclude liability-side loan terms
   const compAdvances = findValue([
     "loans & advances", "loans and advances",
     "tds and tcs receivable", "tds receivable", "tcs receivable",
     "advance to", "prepaid", "other current assets",
-  ]);
+  ], false, ["secured loans", "unsecured loans", "term loan", "from bank", "from others", "long term"]);
 
   // Current Assets: take the MAX of (direct label) vs (sum of components)
   // because proprietary BS often labels "CURRENT ASSETS" for only bank/cash
@@ -210,29 +217,36 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
   data.currentAssets = caSum > (caLabel || 0) ? caSum : (caLabel || caSum || undefined);
 
   // --- Liabilities components ---
+
+  // Creditors — exclude debtors keywords to avoid two-column cross-matches
   const compCreditors = findValue([
     "sundry creditors", "trade creditors",
     "trade payables", "accounts payable",
     "creditors",
-  ], false, ["provision", "other payables"]);
+  ], false, ["provision", "other payables", "debtors", "receivable"]);
 
-  // "OTHER PROVISION B/S" in Kalu Ram BS — look for the TOTAL provision line
+  // Provisions / Other Current Liabilities
+  // "OTHER PROVISION B/S" in Kalu Ram BS is the TOTAL; avoid double-counting sub-items
   const compProvisions = findValue([
     "other provision b/s", "other provision",
     "other current liabilities",
     "provisions",
     "accrued liabilities",
-  ]);
+  ], false, ["for taxation", "for doubtful"]);
 
   const compOD = findValue(["bank overdraft", "od payable", "cash credit"]);
 
-  // Salary payable, GST payable etc — only if no "other provision" total found
+  // Salary payable, GST payable — only add if NO consolidated provision total found
+  // (avoids adding 1,34,549 + 2,54,263 that are already summed in 7,16,275)
   const compSalaryPayable = compProvisions
     ? undefined
-    : findValue(["salary payable", "salaries payable"]);
+    : findValue(["salary payable", "salaries payable", "wages payable"]);
   const compGstPayable = compProvisions
     ? undefined
-    : findValue(["gst payable", "gst liability"]);
+    : findValue(["gst payable", "gst liability", "taxes payable"]);
+  const compFuelPayable = compProvisions
+    ? undefined
+    : findValue(["fuel payable", "fuel liability"]);
 
   const clLabel =
     findValue(["total current liabilities"], true) ??
@@ -243,6 +257,7 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
     (compProvisions || 0) +
     (compSalaryPayable || 0) +
     (compGstPayable || 0) +
+    (compFuelPayable || 0) +
     (compOD || 0);
 
   data.currentLiabilities =
@@ -263,14 +278,16 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
 
   // ── P&L FIELDS ────────────────────────────────────────────────────────────
 
-  // Revenue / Sales
+  // Revenue / Sales — try specific labels first, then generic
   data.sales =
     findValue(["net revenue from operations", "revenue from operations"], true) ??
-    findValue(["gross receipts"], true) ??
-    findValue(["by gross receipts"], true) ??
+    findValue(["gross receipts", "by gross receipts"], true) ??
     findValue(["net sales", "net turnover"], true) ??
     findValue(["total revenue", "gross revenue", "total income from operations"], true, [
       "other income", "finance income", "cost",
+    ]) ??
+    findValue(["total income"], true, [
+      "other income", "non-operating", "finance income",
     ]) ??
     findValue(["sales"], true, [
       "cost of sales", "cost of goods sold", "cost of revenue",
@@ -278,14 +295,14 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
     ]) ??
     findValue(["turnover"], true, ["inventory turnover", "asset turnover"]);
 
-  // COGS
+  // COGS — direct label first, then derive from purchases + stock changes
   data.cogs =
     findValue(["cost of goods sold", "cost of goods"], true) ??
     findValue(["cost of sales", "cost of revenue"], true) ??
     findValue(["cost of production", "direct costs", "manufacturing cost"], true) ??
     findValue(["cogs"]);
 
-  // Purchases
+  // Purchases — used for creditor days and COGS approximation
   data.purchases =
     findValue(["purchases of stock-in-trade", "purchase of stock", "purchases of traded goods"], true) ??
     findValue(["raw material consumed", "material consumed", "raw materials consumed"], true) ??
@@ -295,17 +312,39 @@ export function extractWorkingCapitalFromText(text: string): WorkingCapitalData 
   data.expenses =
     findValue(["total operating expenses", "total expenses"], true, ["cost of goods", "cost of sales"]) ??
     findValue(["operating expenses", "opex"], true) ??
-    findValue(["indirect expenses", "administrative expenses", "general expenses"], true);
+    findValue(["indirect expenses", "administrative expenses", "general and administrative"], true);
 
-  // Net Profit
+  // Gross Profit (extract directly if available, helps when sales/COGS not explicit)
+  const grossProfit =
+    findValue(["gross profit"], true, ["gross profit margin", "gross profit %", "gross loss"]);
+
+  // Net Profit — ordered from most specific to generic
+  // "To Net Profit" / "To Net Profit c/d" — traditional Indian proprietary P&L
+  // "Net Profit Transferred to Capital" — another common proprietary form
   data.netProfit =
     findValue(["profit for the period", "profit for the year"], true) ??
     findValue(["profit after tax (pat)", "profit after tax"], true) ??
     findValue(["net profit after tax"], true) ??
     findValue(["to net profit"], true) ??
-    findValue(["net profit"], true, ["gross profit", "operating profit", "before tax"]) ??
-    findValue(["net income"], true, ["gross"]) ??
-    findValue(["profit/(loss) for", "profit / (loss) for"], true);
+    findValue(["net profit transferred to capital", "profit transferred to capital"], true) ??
+    findValue(["net profit c/d", "net profit c/o"], true) ??
+    findValue(["net profit"], true, ["gross profit", "operating profit", "before tax", "net profit margin"]) ??
+    findValue(["net income"], true, ["gross income", "total income"]) ??
+    findValue(["profit/(loss) for", "profit / (loss) for"], true) ??
+    findValue(["surplus", "surplus for the year"], true, ["deficit", "accumulated"]);
+
+  // Derive COGS from gross profit if not found directly:
+  // COGS = Sales - Gross Profit
+  if (!data.cogs && data.sales && grossProfit) {
+    data.cogs = Math.max(0, data.sales - grossProfit);
+  }
+
+  // Derive COGS from purchases if we have opening/closing stock adjustments:
+  // COGS ≈ Purchases + Opening Stock - Closing Stock
+  // (simplified: if no stock data, use purchases as proxy)
+  if (!data.cogs && data.purchases) {
+    data.cogs = data.purchases;
+  }
 
   return data;
 }

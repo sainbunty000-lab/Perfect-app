@@ -71,7 +71,7 @@ export default function GstItrPage() {
 
       for (const pending of pendingSlots) {
         const parsed = await parseGstItrFile(pending.file);
-        const fmt = FORMAT_LABELS[pending.format as keyof typeof FORMAT_LABELS] ?? pending.format;
+        const fmt = FORMAT_LABELS[pending.format as import("@/lib/fileReader").SupportedFormat] ?? pending.format;
 
         if (parsed.gstr) newGstr = { ...newGstr, ...parsed.gstr };
         if (parsed.itr)  newItr  = { ...newItr,  ...parsed.itr };

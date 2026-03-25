@@ -36,17 +36,27 @@ async function extractFromPDF(file: File): Promise<string> {
       height: number;
     }>;
 
-    const lineMap = new Map<number, string[]>();
+    // Group by Y coordinate (rows), keeping X for left-to-right ordering
+    // CRITICAL for two-column balance sheets: items from left column (liabilities)
+    // must appear BEFORE right column (assets) on the same line
+    interface PdfItem { x: number; str: string; }
+    const lineMap = new Map<number, PdfItem[]>();
     for (const item of items) {
-      const y = Math.round(item.transform[5]); // y position
+      if (!item.str.trim()) continue;
+      const y = Math.round(item.transform[5]); // y coordinate
+      const x = item.transform[4];             // x coordinate (left = smaller)
       if (!lineMap.has(y)) lineMap.set(y, []);
-      lineMap.get(y)!.push(item.str);
+      lineMap.get(y)!.push({ x, str: item.str });
     }
 
-    // Sort lines top-to-bottom (descending y in PDF coords = ascending in text)
+    // Sort lines top-to-bottom (PDF y increases upward, so descending = top-first)
     const sortedYs = [...lineMap.keys()].sort((a, b) => b - a);
     const pageText = sortedYs
-      .map((y) => lineMap.get(y)!.join(" ").trim())
+      .map((y) => {
+        // Sort items left-to-right by X position within each line
+        const lineItems = lineMap.get(y)!.sort((a, b) => a.x - b.x);
+        return lineItems.map((it) => it.str).join(" ").trim();
+      })
       .filter(Boolean)
       .join("\n");
 

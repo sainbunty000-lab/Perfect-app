@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Layout } from "@/components/Layout";
 import { parseFinancialFile } from "@/lib/parser";
-import { extractWorkingCapitalFromText } from "@/lib/parser";
 import { calculateWorkingCapital } from "@/lib/calculations";
 import type { WorkingCapitalData } from "@/lib/parser";
 import type { WorkingCapitalResults } from "@/lib/calculations";

@@ -114,7 +114,8 @@ function parseNum(raw: string | null | undefined): number | null {
 }
 
 function extractNums(text: string): number[] {
-  const m = text.match(/\([\d,]+(?:\.\d+)?\)|-?[\d,]+(?:\.\d+)?/g) || [];
+  // Use parentheses for negatives only — avoids false matches in date strings like "31-03-2024"
+  const m = text.match(/\([\d,]+(?:\.\d+)?\)|[\d,]+(?:\.\d+)?/g) || [];
   return m.map((s) => parseNum(s)).filter((n): n is number => n !== null && Math.abs(n) >= 0.01);
 }
 
