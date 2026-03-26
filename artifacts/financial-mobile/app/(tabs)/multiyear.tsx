@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, Component } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, useWindowDimensions,
 } from "react-native";
+import { ErrorFallback } from "@/components/ErrorFallback";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
@@ -33,6 +34,7 @@ interface YearData {
   netWorth?:           number;
   // From P&L
   sales?:      number;
+  cogs?:       number;
   grossProfit?: number;
   netProfit?:  number;
   expenses?:   number;
@@ -75,6 +77,20 @@ function trend(vals: (number | null)[]) {
   if (clean.length < 2) return null;
   const delta = clean[clean.length - 1] - clean[0];
   return { up: delta >= 0, pct: ((delta / Math.abs(clean[0])) * 100).toFixed(1) };
+}
+
+// ─── Local error boundary for results section ─────────────────────────────────
+class ResultsErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error)
+      return <ErrorFallback error={this.state.error} resetError={() => this.setState({ error: null })} />;
+    return this.props.children;
+  }
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -178,13 +194,17 @@ export default function MultiYearScreen() {
   };
 
   const handleAnalyze = () => {
-    const hasData = slots.some((s) => s.data.sales !== undefined || s.data.currentAssets !== undefined);
-    if (!hasData) {
-      Alert.alert("No Data", "Upload at least one year's documents first.");
-      return;
+    try {
+      const hasData = slots.some((s) => s.data.sales !== undefined || s.data.currentAssets !== undefined);
+      if (!hasData) {
+        Alert.alert("No Data", "Upload at least one year's documents first.");
+        return;
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setAnalyzed(true);
+    } catch (e: any) {
+      Alert.alert("Analysis Failed", e?.message ?? "Could not generate trend analysis.");
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setAnalyzed(true);
   };
 
   // ── Chart data ────────────────────────────────────────────────────────────
@@ -330,6 +350,7 @@ export default function MultiYearScreen() {
 
         {/* ── RESULTS ───────────────────────────────────────────── */}
         {analyzed && (
+          <ResultsErrorBoundary>
           <>
             {/* Year-over-year metrics table */}
             <GlassCard accentColor={GREEN}>
@@ -461,6 +482,7 @@ export default function MultiYearScreen() {
             {/* ── Multi-Year Final Summary ─────────────────────── */}
             <MultiYearFinalSummary slots={slots} />
           </>
+          </ResultsErrorBoundary>
         )}
 
         <TabNavBar current="multiyear" />
@@ -643,3 +665,7 @@ const styles = StyleSheet.create({
   summaryYear: { fontSize: 12, color: "#C8DDF0", fontFamily: "Inter_500Medium" },
   summaryVal: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 });
+
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  return <ErrorFallback error={error} resetError={retry} />;
+}

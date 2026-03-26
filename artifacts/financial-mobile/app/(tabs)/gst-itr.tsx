@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, Component } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, Alert, Platform, KeyboardAvoidingView,
 } from "react-native";
+import { ErrorFallback } from "@/components/ErrorFallback";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
@@ -138,6 +139,20 @@ function buildSummaryText(r: AnalysisResult): string {
 const INR = (n?: number) => n !== undefined ? "₹" + Math.abs(n).toLocaleString("en-IN") : "—";
 const PCT = (n?: number) => n !== undefined ? n.toFixed(1) + "%" : "—";
 
+// ─── Local error boundary for results section ─────────────────────────────────
+class ResultsErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error)
+      return <ErrorFallback error={this.state.error} resetError={() => this.setState({ error: null })} />;
+    return this.props.children;
+  }
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function GstItrScreen() {
   const insets    = useSafeAreaInsets();
@@ -212,7 +227,11 @@ export default function GstItrScreen() {
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setResult(analyze(gstrData, itrData));
+    try {
+      setResult(analyze(gstrData, itrData));
+    } catch (e: any) {
+      Alert.alert("Analysis Failed", e?.message ?? "Could not complete compliance analysis.");
+    }
   };
 
   const handleExport = async () => {
@@ -338,6 +357,7 @@ export default function GstItrScreen() {
 
           {/* ── Results ───────────────────────────────────────────── */}
           {result && (
+            <ResultsErrorBoundary>
             <>
               {/* Score card */}
               <LinearGradient
@@ -457,6 +477,7 @@ export default function GstItrScreen() {
                 <Text style={[styles.exportText, { color: PURPLE }]}>Export PDF Report</Text>
               </TouchableOpacity>
             </>
+            </ResultsErrorBoundary>
           )}
           <TabNavBar current="gst-itr" />
         </ScrollView>
@@ -602,3 +623,7 @@ const styles = StyleSheet.create({
   exportBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 14, paddingVertical: 14, borderWidth: 1, overflow: "hidden" },
   exportText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });
+
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  return <ErrorFallback error={error} resetError={retry} />;
+}

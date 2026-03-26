@@ -4,6 +4,7 @@
  * case type breakdown, performance summary, and recent activity.
  */
 import React, { useMemo } from "react";
+import { ErrorFallback } from "@/components/ErrorFallback";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   useWindowDimensions,
@@ -638,3 +639,7 @@ const styles = StyleSheet.create({
   },
   quickLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 });
+
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  return <ErrorFallback error={error} resetError={retry} />;
+}

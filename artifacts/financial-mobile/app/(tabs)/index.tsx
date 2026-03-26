@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ErrorFallback } from "@/components/ErrorFallback";
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Platform,
@@ -556,3 +557,7 @@ const styles = StyleSheet.create({
   modalSaveBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: "center" },
   modalSaveText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });
+
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  return <ErrorFallback error={error} resetError={retry} />;
+}

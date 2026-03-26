@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { ErrorFallback } from "@/components/ErrorFallback";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Alert, RefreshControl,
@@ -209,3 +210,7 @@ const styles = StyleSheet.create({
   metricLabel: { fontSize: 10, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.5 },
   metricValue: { fontSize: 17, fontFamily: "Inter_700Bold" },
 });
+
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  return <ErrorFallback error={error} resetError={retry} />;
+}
