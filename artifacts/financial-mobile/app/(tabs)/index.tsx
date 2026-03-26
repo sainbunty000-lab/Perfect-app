@@ -333,6 +333,20 @@ export default function WorkingCapitalScreen() {
                   </TouchableOpacity>
                 </View>
               </StepCard>
+
+              <TouchableOpacity
+                style={styles.resetBtn}
+                onPress={() => {
+                  setBsAsset(null); setBsSlot(null);
+                  setPlAsset(null); setPlSlot(null);
+                  setData({}); setResults(null);
+                  setClientName(""); setShowInputs(false);
+                }}
+                activeOpacity={0.8}
+              >
+                <Feather name="refresh-cw" size={14} color={C.textSecondary} />
+                <Text style={styles.resetBtnText}>Start New Analysis</Text>
+              </TouchableOpacity>
             </>
           )}
 
@@ -546,6 +560,8 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: "row", gap: 10, marginTop: 4 },
   actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 14, paddingVertical: 13, borderWidth: 1, backgroundColor: "#0C1826" },
   actionBtnText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  resetBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: "#243448", backgroundColor: "#0C1826", marginTop: 4 },
+  resetBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#8A9DB5" },
 
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.75)", justifyContent: "flex-end" },
   modalCard: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 12, borderWidth: 1, borderColor: "#1E3044" },

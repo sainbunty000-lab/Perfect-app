@@ -90,10 +90,21 @@ export async function parseFinancialDocument<T = Record<string, unknown>>(
   await appendFileToForm(formData, uri, name, resolvedMime);
   formData.append("docType", docType);
 
-  const resp = await fetch(`${base}/api/parse-financial`, {
-    method: "POST",
-    body: formData,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90000);
+  let resp: Response;
+  try {
+    resp = await fetch(`${base}/api/parse-financial`, {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+  } catch (e: any) {
+    clearTimeout(timeout);
+    if (e?.name === "AbortError") throw new Error("Request timed out. Please try again.");
+    throw e;
+  }
+  clearTimeout(timeout);
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));

@@ -521,6 +521,20 @@ export default function MultiYearScreen() {
                 <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: GREEN }}>Save Case</Text>
               </TouchableOpacity>
             </View>
+
+
+            <TouchableOpacity
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: "#243448", backgroundColor: "#0C1826", marginTop: 4 }}
+              onPress={() => {
+                setSlots(DEFAULT_LABELS.map(emptySlot));
+                setActiveSlot(0); setShowResults(false);
+                setClientName(""); setSaveModal(false);
+              }}
+              activeOpacity={0.8}
+            >
+              <Feather name="refresh-cw" size={14} color="#8A9DB5" />
+              <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#8A9DB5" }}>Start New Analysis</Text>
+            </TouchableOpacity>
           </>
           </ResultsErrorBoundary>
         )}
