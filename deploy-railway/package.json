@@ -5,5 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node --enable-source-maps dist/index.mjs"
+  },
+  "dependencies": {
+    "@google/genai": "^1.44.0"
   }
 }
