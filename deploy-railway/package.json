@@ -3,11 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node --enable-source-maps dist/index.mjs"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.1",
-    "google-auth-library": "^9.15.1"
+    "drizzle-orm": "0.45.1",
+    "pg": "8.16.0",
+    "google-auth-library": "9.15.1",
+    "@google/genai": "1.44.0"
   }
 }
