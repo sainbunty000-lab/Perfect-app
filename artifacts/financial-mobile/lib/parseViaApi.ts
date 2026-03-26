@@ -7,6 +7,8 @@ import { Platform } from "react-native";
 import { normalizeFields } from "./fieldMapper";
 
 function getApiBase(): string {
+  const railwayUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (railwayUrl) return railwayUrl.replace(/\/+$/, "");
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
   return domain ? `https://${domain}` : "http://localhost:3000";
 }
