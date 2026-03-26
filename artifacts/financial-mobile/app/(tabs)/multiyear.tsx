@@ -242,11 +242,11 @@ export default function MultiYearScreen() {
       };
       const sc = filledSlots.length >= 2 ? cagr(filledSlots[0].data.sales, filledSlots[filledSlots.length - 1].data.sales) : null;
       const nc = filledSlots.length >= 2 ? cagr(filledSlots[0].data.netProfit, filledSlots[filledSlots.length - 1].data.netProfit) : null;
-      await createCase.mutateAsync({
+      await createCase.mutateAsync({ data: {
         clientName: clientName.trim(), caseType: "multi_year",
         multiYearData: slots.map(s => ({ label: s.data.label, data: s.data })) as any,
         multiYearResults: { salesCagr: sc, npCagr: nc, filled: filledSlots.length, years: slots.map(s => s.data) } as any,
-      } as any);
+      } } as any);
       setSaveModal(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Saved", "Multi-year case saved successfully.");

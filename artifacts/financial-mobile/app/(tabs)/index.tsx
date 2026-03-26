@@ -147,10 +147,10 @@ export default function WorkingCapitalScreen() {
     if (!results) { Alert.alert("Calculate First", "Run the calculation before saving."); return; }
     setSaving(true);
     try {
-      await createCase.mutateAsync({
+      await createCase.mutateAsync({ data: {
         clientName: clientName.trim(), caseType: "working_capital",
         workingCapitalData: data as any, workingCapitalResults: results as any,
-      } as any);
+      } } as any);
       setSaveModal(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Saved", "Case saved successfully.");

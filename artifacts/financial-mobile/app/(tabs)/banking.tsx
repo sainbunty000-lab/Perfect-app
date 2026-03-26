@@ -178,10 +178,10 @@ export default function BankingScreen() {
     if (!results) { Alert.alert("Calculate First"); return; }
     setSaving(true);
     try {
-      await createCase.mutateAsync({
+      await createCase.mutateAsync({ data: {
         clientName: clientName.trim(), caseType: "banking",
         bankingData: data as any, bankingResults: results as any,
-      } as any);
+      } } as any);
       setSaveModal(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Saved", "Case saved successfully.");
