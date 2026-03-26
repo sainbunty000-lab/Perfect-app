@@ -1,8 +1,9 @@
 import React, { useState, Component } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, useWindowDimensions,
+  Alert, useWindowDimensions, ActivityIndicator, Modal, TextInput,
 } from "react-native";
+import { useCreateCase } from "@workspace/api-client-react";
 import { ErrorFallback } from "@/components/ErrorFallback";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -100,9 +101,14 @@ export default function MultiYearScreen() {
   const { width } = useWindowDimensions();
   const chartW    = width - 32 - 36;
 
+  const createCase = useCreateCase();
+
   const [slots, setSlots] = useState<YearSlot[]>(DEFAULT_LABELS.map(emptySlot));
   const [expanded, setExpanded] = useState<boolean[]>([true, false, false]);
   const [analyzed, setAnalyzed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveModal, setSaveModal] = useState(false);
+  const [clientName, setClientName] = useState("");
 
   // ── Parse helpers ─────────────────────────────────────────────────────────
   const setSlot = (i: number, patch: Partial<YearSlot>) =>
@@ -223,7 +229,33 @@ export default function MultiYearScreen() {
   const salesTrend = trend(salesV);
   const npTrend    = trend(npV);
 
+  const handleSave = async () => {
+    if (!clientName.trim()) { Alert.alert("Client Name Required", "Enter a client name to save."); return; }
+    if (!analyzed) { Alert.alert("Analyze First", "Run the analysis before saving."); return; }
+    setSaving(true);
+    try {
+      const filledSlots = slots.filter(s => (s.data.sales ?? 0) > 0);
+      const cagr = (base?: number, end?: number) => {
+        if (!base || !end || filledSlots.length < 2) return null;
+        const yrs = filledSlots.length - 1;
+        return ((end / base) ** (1 / yrs) - 1) * 100;
+      };
+      const sc = filledSlots.length >= 2 ? cagr(filledSlots[0].data.sales, filledSlots[filledSlots.length - 1].data.sales) : null;
+      const nc = filledSlots.length >= 2 ? cagr(filledSlots[0].data.netProfit, filledSlots[filledSlots.length - 1].data.netProfit) : null;
+      await createCase.mutateAsync({
+        clientName: clientName.trim(), caseType: "multi_year",
+        multiYearData: slots.map(s => ({ label: s.data.label, data: s.data })) as any,
+        multiYearResults: { salesCagr: sc, npCagr: nc, filled: filledSlots.length, years: slots.map(s => s.data) } as any,
+      } as any);
+      setSaveModal(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Saved", "Multi-year case saved successfully.");
+    } catch { Alert.alert("Save Failed", "Could not save the case."); }
+    finally { setSaving(false); }
+  };
+
   return (
+    <>
     <PageBackground>
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16, paddingBottom: tabHeight + 24 }]}
@@ -481,6 +513,14 @@ export default function MultiYearScreen() {
 
             {/* ── Multi-Year Final Summary ─────────────────────── */}
             <MultiYearFinalSummary slots={slots} />
+
+            <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
+              <TouchableOpacity style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 14, borderWidth: 1, borderColor: GREEN + "55" }}
+                onPress={() => setSaveModal(true)}>
+                <Feather name="save" size={16} color={GREEN} />
+                <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: GREEN }}>Save Case</Text>
+              </TouchableOpacity>
+            </View>
           </>
           </ResultsErrorBoundary>
         )}
@@ -488,6 +528,29 @@ export default function MultiYearScreen() {
         <TabNavBar current="multiyear" />
       </ScrollView>
     </PageBackground>
+
+    <Modal visible={saveModal} transparent animationType="slide" onRequestClose={() => setSaveModal(false)}>
+      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "#00000088" }}>
+        <LinearGradient colors={["#1A2C42", "#111F30"]} style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16 }}>
+          <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#E8F0F8", textAlign: "center" }}>Save Multi-Year Case</Text>
+          <TextInput
+            style={{ backgroundColor: "#0D1B2A", borderRadius: 14, padding: 14, fontSize: 14, fontFamily: "Inter_500Medium", color: "#E8F0F8", borderWidth: 1, borderColor: "#1E3A54" }}
+            placeholder="Client / Company Name" placeholderTextColor="#3D5A74"
+            value={clientName} onChangeText={setClientName} autoFocus
+          />
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <TouchableOpacity style={{ flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", alignItems: "center" }} onPress={() => setSaveModal(false)}>
+              <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A9BB5" }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={{ flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: "center", backgroundColor: GREEN }} onPress={handleSave} disabled={saving}>
+              {saving ? <ActivityIndicator size="small" color="#000" />
+                : <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#000" }}>Save</Text>}
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </View>
+    </Modal>
+    </>
   );
 }
 

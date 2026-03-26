@@ -1,8 +1,9 @@
 import React, { useState, Component } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, Platform, KeyboardAvoidingView,
+  ActivityIndicator, Alert, Platform, KeyboardAvoidingView, Modal, TextInput,
 } from "react-native";
+import { useCreateCase } from "@workspace/api-client-react";
 import { ErrorFallback } from "@/components/ErrorFallback";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -158,9 +159,14 @@ export default function GstItrScreen() {
   const insets    = useSafeAreaInsets();
   const tabHeight = useBottomTabBarHeight();
 
+  const createCase = useCreateCase();
+
   const [gstrParsing, setGstrParsing] = useState(false);
   const [itrParsing,  setItrParsing]  = useState(false);
   const [exporting,   setExporting]   = useState(false);
+  const [saving, setSaving]           = useState(false);
+  const [saveModal, setSaveModal]     = useState(false);
+  const [clientName, setClientName]   = useState("");
 
   const [gstrAsset, setGstrAsset] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [itrAsset,  setItrAsset]  = useState<DocumentPicker.DocumentPickerAsset | null>(null);
@@ -240,6 +246,22 @@ export default function GstItrScreen() {
     try { await exportGstItrPDF("GST & ITR Analysis", buildSummaryText(result)); }
     catch { Alert.alert("Export Failed"); }
     finally { setExporting(false); }
+  };
+
+  const handleSave = async () => {
+    if (!clientName.trim()) { Alert.alert("Client Name Required", "Enter a client name to save."); return; }
+    if (!result) { Alert.alert("Analyze First", "Run the analysis before saving."); return; }
+    setSaving(true);
+    try {
+      await createCase.mutateAsync({
+        clientName: clientName.trim(), caseType: "gst_itr",
+        gstItrData: { gstr: gstrData, itr: itrData } as any, gstItrResults: result as any,
+      } as any);
+      setSaveModal(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Saved", "GST & ITR case saved successfully.");
+    } catch { Alert.alert("Save Failed", "Could not save the case."); }
+    finally { setSaving(false); }
   };
 
   const gradeColor = (g: string) =>
@@ -467,21 +489,50 @@ export default function GstItrScreen() {
               {/* ── GST/ITR Final Summary ─────────────────────────── */}
               <GstFinalSummary result={result} />
 
-              {/* Export */}
-              <TouchableOpacity style={[styles.exportBtn, { borderColor: PURPLE + "55" }]}
-                onPress={handleExport} disabled={exporting}>
-                <LinearGradient colors={[PURPLE + "18", PURPLE + "08"]} style={StyleSheet.absoluteFill} />
-                {exporting
-                  ? <ActivityIndicator size="small" color={PURPLE} />
-                  : <Feather name="download" size={16} color={PURPLE} />}
-                <Text style={[styles.exportText, { color: PURPLE }]}>Export PDF Report</Text>
-              </TouchableOpacity>
+              {/* Actions */}
+              <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
+                <TouchableOpacity style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 14, borderWidth: 1, borderColor: PURPLE + "55" }}
+                  onPress={() => setSaveModal(true)}>
+                  <Feather name="save" size={16} color={PURPLE} />
+                  <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: PURPLE }}>Save Case</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.exportBtn, { borderColor: C.secondary + "55", flex: 1 }]}
+                  onPress={handleExport} disabled={exporting}>
+                  <LinearGradient colors={[PURPLE + "18", PURPLE + "08"]} style={StyleSheet.absoluteFill} />
+                  {exporting
+                    ? <ActivityIndicator size="small" color={C.secondary} />
+                    : <Feather name="download" size={16} color={C.secondary} />}
+                  <Text style={[styles.exportText, { color: C.secondary }]}>Export PDF</Text>
+                </TouchableOpacity>
+              </View>
             </>
             </ResultsErrorBoundary>
           )}
           <TabNavBar current="gst-itr" />
         </ScrollView>
       </PageBackground>
+
+      <Modal visible={saveModal} transparent animationType="slide" onRequestClose={() => setSaveModal(false)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "#00000088" }}>
+          <LinearGradient colors={["#1A2C42", "#111F30"]} style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16 }}>
+            <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#E8F0F8", textAlign: "center" }}>Save GST & ITR Case</Text>
+            <TextInput
+              style={{ backgroundColor: "#0D1B2A", borderRadius: 14, padding: 14, fontSize: 14, fontFamily: "Inter_500Medium", color: "#E8F0F8", borderWidth: 1, borderColor: "#1E3A54" }}
+              placeholder="Client / Company Name" placeholderTextColor="#3D5A74"
+              value={clientName} onChangeText={setClientName} autoFocus
+            />
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <TouchableOpacity style={{ flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", alignItems: "center" }} onPress={() => setSaveModal(false)}>
+                <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A9BB5" }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: "center", backgroundColor: PURPLE }} onPress={handleSave} disabled={saving}>
+                {saving ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" }}>Save</Text>}
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

@@ -88,22 +88,33 @@ export default function SavedCasesScreen() {
                 </View>
                 <Text style={styles.emptyTitle}>No saved cases yet</Text>
                 <Text style={styles.emptyText}>
-                  Cases you save from Working Capital or Banking Analysis will appear here.
+                  Cases you save from any analysis tab will appear here.
                 </Text>
               </>
             )}
           </View>
         }
         renderItem={({ item }) => {
-          const isWC = item.caseType === "working_capital";
-          const iconColor = isWC ? C.secondary : C.accent;
-          const iconName = isWC ? "bar-chart-2" : "activity";
-          const typeLabel = isWC ? "Working Capital" : "Banking";
+          const caseMap: Record<string, { color: string; icon: string; label: string }> = {
+            working_capital: { color: C.secondary, icon: "bar-chart-2", label: "Working Capital" },
+            banking: { color: C.accent, icon: "activity", label: "Banking" },
+            multi_year: { color: C.success, icon: "trending-up", label: "Multi-Year" },
+            gst_itr: { color: "#A855F7", icon: "file-text", label: "GST & ITR" },
+          };
+          const info = caseMap[item.caseType] ?? { color: C.primary, icon: "folder", label: item.caseType };
+          const iconColor = info.color;
+          const iconName = info.icon;
+          const typeLabel = info.label;
           const wcResults = item.workingCapitalResults as any;
           const bankResults = item.bankingResults as any;
-          const metric = isWC
-            ? { label: "Eligibility", value: INR(wcResults?.eligibilityAmount) }
-            : { label: "Score", value: bankResults?.overallScore ? bankResults.overallScore + "/100" : "—" };
+          const myResults = (item as any).multiYearResults;
+          const gstResults = (item as any).gstItrResults;
+          const metric =
+            item.caseType === "working_capital" ? { label: "Eligibility", value: INR(wcResults?.eligibilityAmount) }
+            : item.caseType === "banking" ? { label: "Score", value: bankResults?.overallScore ? bankResults.overallScore + "/100" : "—" }
+            : item.caseType === "multi_year" ? { label: "Years", value: myResults?.filled ? `${myResults.filled} yrs` : "—" }
+            : item.caseType === "gst_itr" ? { label: "Grade", value: gstResults?.complianceGrade ?? "—" }
+            : { label: "Type", value: typeLabel };
 
           return (
             <LinearGradient

@@ -19,6 +19,7 @@ router.post("/cases", async (req, res) => {
   try {
     const parsed = insertCaseSchema.safeParse(req.body);
     if (!parsed.success) {
+      req.log.warn({ errors: parsed.error.issues, bodyKeys: Object.keys(req.body || {}) }, "Case validation failed");
       res.status(400).json({ message: "Invalid input", errors: parsed.error.issues });
       return;
     }

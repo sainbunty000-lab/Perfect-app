@@ -91,6 +91,8 @@ export type CaseInputCaseType =
 export const CaseInputCaseType = {
   working_capital: "working_capital",
   banking: "banking",
+  multi_year: "multi_year",
+  gst_itr: "gst_itr",
   combined: "combined",
 } as const;
 
@@ -99,8 +101,12 @@ export interface CaseInput {
   caseType: CaseInputCaseType;
   workingCapitalData?: WorkingCapitalData;
   bankingData?: BankingData;
+  multiYearData?: unknown;
+  gstItrData?: unknown;
   workingCapitalResults?: WorkingCapitalResults;
   bankingResults?: BankingResults;
+  multiYearResults?: unknown;
+  gstItrResults?: unknown;
   notes?: string;
 }
 

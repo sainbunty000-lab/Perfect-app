@@ -51,8 +51,9 @@ Canonical field name → app key mappings:
 - **Working Capital** tab — separate Balance Sheet + P&L upload zones, each calls `/api/parse-financial` with `docType=balance_sheet` or `profit_loss`
 - **Banking Analysis** tab — single bank statement upload, calls `/api/parse-financial` with `docType=banking`, auto-detects bank name + period
 - **GST & ITR** tab — **two separate upload zones**: GSTR section (docType=`gstr`) and ITR section (docType=`itr`) — full extracted fields shown per section before combined analysis
-- **Saved Cases** tab — DB-backed case list
+- **Saved Cases** tab — DB-backed case list, displays all 4 case types (working_capital, banking, multi_year, gst_itr) with distinct icons/colors/metrics
 - All parsing via server-side `parseFinancialDocument()` in `lib/parseViaApi.ts` — 100% server-side accuracy, no client regex
+- Save functionality: all 4 analysis tabs (WC, Banking, Multi-Year, GST & ITR) support saving cases to the database via `useCreateCase` mutation + save modal
 
 ### API Server — Financial Parsing (`artifacts/api-server`)
 - `POST /api/parse-financial` — accepts `file` + `docType`, auto-detects format (PDF/Excel/Image/CSV), runs OCR if needed, returns `{ text, format, fields }` with fully structured financial data
