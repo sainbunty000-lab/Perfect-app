@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "Dhanush Financial",
-    "slug": "financial-mobile",
+    "slug": "dhanush-financial",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "financial-mobile",
+    "scheme": "dhanush-financial",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
@@ -22,7 +22,11 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0A1628"
       },
-      "package": "com.dhanushenterprises.financial"
+      "package": "com.dhanushenterprises.financial",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "favicon": "./assets/images/icon.png"
