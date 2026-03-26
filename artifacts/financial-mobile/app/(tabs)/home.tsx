@@ -20,7 +20,6 @@ const MODULES = [
   { name: "index",     label: "Working Capital",    icon: "bar-chart-2",   color: C.secondary, iconLib: "feather",   badge: "Core Module" },
   { name: "banking",   label: "Banking Performance",icon: "bank-outline",  color: C.accent,    iconLib: "material",  badge: "Core Module" },
   { name: "multiyear", label: "Multi-Year Analysis",icon: "trending-up",   color: C.success,   iconLib: "feather",   badge: "Advanced"    },
-  { name: "gst-itr",  label: "GST & ITR",           icon: "file-text",     color: "#8B6CC1",   iconLib: "feather",   badge: "Compliance"  },
   { name: "saved",     label: "Saved Cases",        icon: "folder",        color: "#C47A3A",   iconLib: "feather",   badge: "Records"     },
 ] as const;
 
@@ -69,7 +68,7 @@ export default function HomeScreen() {
 
           <Text style={styles.heroHeadline}>Smart Analysis.{"\n"}Instant Results.</Text>
           <Text style={styles.heroBody}>
-            AI-powered document parsing — upload any Balance Sheet, P&L, Bank Statement, GST return, or ITR and get structured financials in seconds.
+            AI-powered document parsing — upload any Balance Sheet, P&L, or Bank Statement and get structured financials in seconds.
           </Text>
 
           <View style={styles.heroStats}>

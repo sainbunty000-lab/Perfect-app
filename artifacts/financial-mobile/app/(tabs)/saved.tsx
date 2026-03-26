@@ -99,7 +99,6 @@ export default function SavedCasesScreen() {
             working_capital: { color: C.secondary, icon: "bar-chart-2", label: "Working Capital" },
             banking: { color: C.accent, icon: "activity", label: "Banking" },
             multi_year: { color: C.success, icon: "trending-up", label: "Multi-Year" },
-            gst_itr: { color: "#8B6CC1", icon: "file-text", label: "GST & ITR" },
           };
           const info = caseMap[item.caseType] ?? { color: C.primary, icon: "folder", label: item.caseType };
           const iconColor = info.color;
@@ -108,12 +107,10 @@ export default function SavedCasesScreen() {
           const wcResults = item.workingCapitalResults as any;
           const bankResults = item.bankingResults as any;
           const myResults = (item as any).multiYearResults;
-          const gstResults = (item as any).gstItrResults;
           const metric =
             item.caseType === "working_capital" ? { label: "Eligibility", value: INR(wcResults?.eligibilityAmount) }
             : item.caseType === "banking" ? { label: "Score", value: bankResults?.overallScore ? bankResults.overallScore + "/100" : "—" }
             : item.caseType === "multi_year" ? { label: "Years", value: myResults?.filled ? `${myResults.filled} yrs` : "—" }
-            : item.caseType === "gst_itr" ? { label: "Grade", value: gstResults?.complianceGrade ?? "—" }
             : { label: "Type", value: typeLabel };
 
           return (

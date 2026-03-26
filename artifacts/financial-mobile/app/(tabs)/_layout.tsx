@@ -76,14 +76,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="gst-itr"
-        options={{
-          title: "GST",
-          tabBarActiveTintColor: "#8B6CC1",
-          tabBarIcon: ({ color }) => <Feather name="file-text" size={18} color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="saved"
         options={{
           title: "Cases",

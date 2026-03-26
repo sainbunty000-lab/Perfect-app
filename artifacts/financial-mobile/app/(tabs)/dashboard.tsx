@@ -38,19 +38,16 @@ function formatDate(ts: string | number | null | undefined) {
 const TYPE_COLOR: Record<string, string> = {
   working_capital: "#5B8DB8",
   banking:         "#D4A853",
-  gst_itr:         "#8B6CC1",
   multi_year:      "#10B981",
 };
 const TYPE_LABEL: Record<string, string> = {
   working_capital: "WC",
   banking:         "Bank",
-  gst_itr:         "GST",
   multi_year:      "MYr",
 };
 const TYPE_ICON: Record<string, string> = {
   working_capital: "bar-chart-2",
   banking:         "credit-card",
-  gst_itr:         "file-text",
   multi_year:      "trending-up",
 };
 
@@ -181,10 +178,6 @@ export default function DashboardScreen() {
             label="Multi-Year"   value={String(byType["multi_year"] ?? 0)}
             icon="trending-up"   color="#10B981"
           />
-          <KpiCard
-            label="GST & ITR"    value={String(byType["gst_itr"] ?? 0)}
-            icon="file-text"     color="#8B6CC1"
-          />
         </View>
 
         {/* ── WC Eligibility Trend ─────────────────────────────────── */}
@@ -294,7 +287,7 @@ export default function DashboardScreen() {
                   centerValue={String(total)}
                   centerLabel="cases"
                   slices={
-                    (["working_capital", "banking", "multi_year", "gst_itr"] as const)
+                    (["working_capital", "banking", "multi_year"] as const)
                       .filter((t) => (byType[t] ?? 0) > 0)
                       .map((t) => ({
                         label: TYPE_LABEL[t],
@@ -308,7 +301,7 @@ export default function DashboardScreen() {
               {/* Detailed bar breakdown below pie */}
               <View style={{ marginTop: 8 }}>
                 <HorizontalBarChart
-                  items={(["working_capital", "banking", "multi_year", "gst_itr"] as const).map((t) => ({
+                  items={(["working_capital", "banking", "multi_year"] as const).map((t) => ({
                     label: TYPE_LABEL[t],
                     value: byType[t] ?? 0,
                     max: total,
@@ -435,7 +428,6 @@ export default function DashboardScreen() {
             { label: "WC Analysis",    name: "index",     color: "#5B8DB8", icon: "bar-chart-2" },
             { label: "Banking",        name: "banking",   color: "#D4A853", icon: "credit-card" },
             { label: "Multi-Year",     name: "multiyear", color: "#10B981", icon: "trending-up" },
-            { label: "GST & ITR",      name: "gst-itr",   color: "#8B6CC1", icon: "file-text" },
           ].map((q) => (
             <TouchableOpacity
               key={q.name}

@@ -20,7 +20,6 @@ export const TAB_ORDER: { name: string; label: string }[] = [
   { name: "index",     label: "WC Analysis" },
   { name: "banking",   label: "Banking" },
   { name: "multiyear", label: "Multi-Year" },
-  { name: "gst-itr",  label: "GST & ITR" },
   { name: "saved",     label: "Saved" },
 ];
 
