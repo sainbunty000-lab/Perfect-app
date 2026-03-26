@@ -50,7 +50,7 @@ interface YearSlot {
   plFile?: string; plFormat?: string; plParsing?: boolean;
 }
 
-const DEFAULT_LABELS = ["FY 2022-23", "FY 2023-24", "FY 2024-25"];
+const DEFAULT_LABELS = ["FY 2023-24", "FY 2024-25", "FY 2025-26"];
 
 function emptySlot(label: string): YearSlot {
   return { data: { label } };
