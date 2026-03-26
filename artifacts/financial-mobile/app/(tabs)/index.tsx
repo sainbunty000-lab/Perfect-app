@@ -309,10 +309,10 @@ export default function WorkingCapitalScreen() {
                     <Text style={styles.chartSectionTitle}>WC Composition</Text>
                     <HorizontalBarChart
                       items={[
-                        { label: "Curr. Assets",   value: data.currentAssets ?? 0,      max: Math.max(data.currentAssets ?? 0, data.currentLiabilities ?? 0, 1), color: "#4A9EFF",  format: compactINR },
+                        { label: "Curr. Assets",   value: data.currentAssets ?? 0,      max: Math.max(data.currentAssets ?? 0, data.currentLiabilities ?? 0, 1), color: "#5B8DB8",  format: compactINR },
                         { label: "Curr. Liab.",    value: data.currentLiabilities ?? 0, max: Math.max(data.currentAssets ?? 0, data.currentLiabilities ?? 0, 1), color: "#EF4444",  format: compactINR },
                         { label: "Net WC",          value: Math.abs(results.workingCapitalAmount ?? 0), max: Math.max(data.currentAssets ?? 0, 1),                   color: C.primary,  format: compactINR },
-                        { label: "Eligibility",    value: results.eligibilityAmount ?? 0,             max: Math.max(data.currentAssets ?? 0, 1),                   color: "#F5C842",  format: compactINR },
+                        { label: "Eligibility",    value: results.eligibilityAmount ?? 0,             max: Math.max(data.currentAssets ?? 0, 1),                   color: "#D4A853",  format: compactINR },
                       ]}
                     />
                   </View>
@@ -342,12 +342,12 @@ export default function WorkingCapitalScreen() {
         {/* Save Modal */}
         <Modal visible={saveModal} transparent animationType="slide" onRequestClose={() => setSaveModal(false)}>
           <View style={styles.modalOverlay}>
-            <LinearGradient colors={["#1A2C42", "#111F30"]} style={styles.modalCard}>
+            <LinearGradient colors={["#15202F", "#0F1A2B"]} style={styles.modalCard}>
               <Text style={styles.modalTitle}>Save Case</Text>
               <TextInput
                 style={styles.modalInput}
                 placeholder="Client / Company Name"
-                placeholderTextColor="#3D5A74"
+                placeholderTextColor="#354D62"
                 value={clientName}
                 onChangeText={setClientName}
                 autoFocus
@@ -371,7 +371,7 @@ export default function WorkingCapitalScreen() {
 // ── Sub-components ──────────────────────────────────────────────────────────────
 function StepCard({ step, title, subtitle, children }: { step: number; title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <LinearGradient colors={["#1A2C42", "#152236"]} style={sc.card}>
+    <LinearGradient colors={["#15202F", "#152236"]} style={sc.card}>
       <View style={sc.header}>
         <View style={sc.badge}>
           <Text style={sc.badgeNum}>{step}</Text>
@@ -386,12 +386,12 @@ function StepCard({ step, title, subtitle, children }: { step: number; title: st
   );
 }
 const sc = StyleSheet.create({
-  card: { borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54", overflow: "hidden", padding: 18 },
+  card: { borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", overflow: "hidden", padding: 14 },
   header: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 16 },
-  badge: { width: 32, height: 32, borderRadius: 10, backgroundColor: "#0C1826", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#1E3A54" },
-  badgeNum: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#4A9EFF" },
-  title: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#E8F4FF" },
-  subtitle: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 2 },
+  badge: { width: 32, height: 32, borderRadius: 10, backgroundColor: "#0C1826", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#1E3044" },
+  badgeNum: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#5B8DB8" },
+  title: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#E5ECF5" },
+  subtitle: { fontSize: 11, color: "#7A95AD", fontFamily: "Inter_400Regular", marginTop: 2 },
   body: { gap: 0 },
 });
 
@@ -418,20 +418,20 @@ function WCFinalSummary({ results }: { results: WorkingCapitalResults }) {
   const verdictGood = cr >= 1.33 && qr >= 1 && elig > 0;
   const verdictMid  = cr >= 1.0  && elig > 0;
   const verdict     = verdictGood ? "ELIGIBLE" : verdictMid ? "BORDERLINE" : "NOT ELIGIBLE";
-  const verdictColor = verdictGood ? "#10B981" : verdictMid ? "#F5C842" : "#EF4444";
-  const verdictBg    = verdictGood ? "#10B98120" : verdictMid ? "#F5C84220" : "#EF444420";
+  const verdictColor = verdictGood ? "#2D8B5F" : verdictMid ? "#D4A853" : "#EF4444";
+  const verdictBg    = verdictGood ? "#2D8B5F20" : verdictMid ? "#F5C84220" : "#EF444420";
 
   const points: { icon: string; color: string; text: string }[] = [
     cr >= 1.33
-      ? { icon: "check-circle", color: "#10B981", text: `Current Ratio ${cr.toFixed(2)}x — adequate liquidity` }
+      ? { icon: "check-circle", color: "#2D8B5F", text: `Current Ratio ${cr.toFixed(2)}x — adequate liquidity` }
       : { icon: "alert-circle", color: "#EF4444", text: `Current Ratio ${cr.toFixed(2)}x — below 1.33x benchmark` },
     qr >= 1
-      ? { icon: "check-circle", color: "#10B981", text: `Quick Ratio ${qr.toFixed(2)}x — strong short-term position` }
-      : { icon: "alert-circle", color: "#F5C842", text: `Quick Ratio ${qr.toFixed(2)}x — may face liquidity pressure` },
+      ? { icon: "check-circle", color: "#2D8B5F", text: `Quick Ratio ${qr.toFixed(2)}x — strong short-term position` }
+      : { icon: "alert-circle", color: "#D4A853", text: `Quick Ratio ${qr.toFixed(2)}x — may face liquidity pressure` },
     npm >= 10
-      ? { icon: "check-circle", color: "#10B981", text: `Net Margin ${npm.toFixed(1)}% — healthy profitability` }
-      : { icon: "info",         color: "#4A9EFF", text: `Net Margin ${npm.toFixed(1)}% — monitor for improvement` },
-    { icon: "trending-up", color: "#4A9EFF", text: `WC Cycle: ${(results.workingCapitalCycle ?? 0).toFixed(0)} days — ${(results.workingCapitalCycle ?? 999) < 60 ? "efficient operations" : "review receivables"}` },
+      ? { icon: "check-circle", color: "#2D8B5F", text: `Net Margin ${npm.toFixed(1)}% — healthy profitability` }
+      : { icon: "info",         color: "#5B8DB8", text: `Net Margin ${npm.toFixed(1)}% — monitor for improvement` },
+    { icon: "trending-up", color: "#5B8DB8", text: `WC Cycle: ${(results.workingCapitalCycle ?? 0).toFixed(0)} days — ${(results.workingCapitalCycle ?? 999) < 60 ? "efficient operations" : "review receivables"}` },
   ];
 
   const recommendation = verdictGood
@@ -477,22 +477,22 @@ function WCFinalSummary({ results }: { results: WorkingCapitalResults }) {
 const sumS = StyleSheet.create({
   wrap: { gap: 12, marginTop: 4 },
   verdict: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 16, borderWidth: 1, padding: 14 },
-  verdictLabel: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  verdictSub: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 1 },
+  verdictLabel: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  verdictSub: { fontSize: 10, color: "#7A95AD", fontFamily: "Inter_400Regular", marginTop: 1 },
   verdictAmount: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  pointsWrap: { gap: 8, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 14 },
+  pointsWrap: { gap: 8, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", padding: 14 },
   pointRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   pointText: { flex: 1, fontSize: 12, color: "#9BBDD4", fontFamily: "Inter_400Regular", lineHeight: 18 },
-  recBox: { backgroundColor: "#0A1628", borderRadius: 14, borderWidth: 1, borderColor: C.primary + "30", padding: 14, gap: 8 },
+  recBox: { backgroundColor: "#080F1E", borderRadius: 14, borderWidth: 1, borderColor: C.primary + "30", padding: 14, gap: 8 },
   recHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   recTitle: { fontSize: 11, fontFamily: "Inter_700Bold", color: C.primary, textTransform: "uppercase", letterSpacing: 0.8 },
-  recText: { fontSize: 12, color: "#8BAFC9", fontFamily: "Inter_400Regular", lineHeight: 19 },
+  recText: { fontSize: 12, color: "#8A9DB5", fontFamily: "Inter_400Regular", lineHeight: 19 },
 });
 
 function RatioTile({ label, value, good, neutral }: { label: string; value: string; good?: boolean; neutral?: boolean }) {
-  const color = neutral ? "#7A9BB5" : good ? C.success : C.warning;
+  const color = neutral ? "#7A95AD" : good ? C.success : C.warning;
   return (
-    <LinearGradient colors={["#0C1826", "#111F30"]} style={styles.ratioTile}>
+    <LinearGradient colors={["#0C1826", "#0F1A2B"]} style={styles.ratioTile}>
       <Text style={styles.ratioVal}>{value}</Text>
       <Text style={[styles.ratioLabel, { color }]}>{label}</Text>
       {!neutral && <View style={[styles.ratioDot, { backgroundColor: good ? C.success : C.warning }]} />}
@@ -510,50 +510,50 @@ function MarginCard({ label, value, good }: { label: string; value: string; good
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 16, gap: 16 },
+  scroll: { paddingHorizontal: 16, gap: 12 },
 
   uploadGap: { height: 10 },
   parsedChip: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12, backgroundColor: C.success + "15", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   parsedText: { fontSize: 11, color: C.success, fontFamily: "Inter_500Medium", flex: 1 },
 
-  hintText: { fontSize: 11, color: "#4A6A84", fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 10, lineHeight: 17 },
+  hintText: { fontSize: 11, color: "#3D5A6E", fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 10, lineHeight: 17 },
   manualToggle: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 14, paddingVertical: 8, borderTopWidth: 1, borderTopColor: "#1A2F45" },
   manualToggleText: { fontSize: 12, color: C.primary, fontFamily: "Inter_500Medium" },
 
   inputRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#0F1E30" },
   inputLabel: { flex: 1, fontSize: 12, color: "#8BAAC0", fontFamily: "Inter_400Regular" },
-  input: { width: 110, textAlign: "right", backgroundColor: "#0C1826", borderWidth: 1, borderColor: "#1E3A54", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: "#E8F4FF", fontFamily: "Inter_600SemiBold" },
+  input: { width: 110, textAlign: "right", backgroundColor: "#0C1826", borderWidth: 1, borderColor: "#1E3044", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, fontSize: 11, color: "#E5ECF5", fontFamily: "Inter_600SemiBold" },
 
-  chartSection: { alignItems: "center", gap: 8, marginVertical: 4, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 14 },
-  chartSectionTitle: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#7A9BB5", textTransform: "uppercase", letterSpacing: 0.8, alignSelf: "flex-start" },
+  chartSection: { alignItems: "center", gap: 8, marginVertical: 4, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", padding: 14 },
+  chartSectionTitle: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#7A95AD", textTransform: "uppercase", letterSpacing: 0.8, alignSelf: "flex-start" },
 
-  eligCard: { borderRadius: 16, padding: 18, alignItems: "center", marginBottom: 16, borderWidth: 1, borderColor: "#1E3A54" },
-  eligLabel: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.8 },
-  eligAmount: { fontSize: 32, fontFamily: "Inter_700Bold", marginTop: 4 },
-  eligSub: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 4 },
+  eligCard: { borderRadius: 16, padding: 14, alignItems: "center", marginBottom: 16, borderWidth: 1, borderColor: "#1E3044" },
+  eligLabel: { fontSize: 11, color: "#7A95AD", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.8 },
+  eligAmount: { fontSize: 26, fontFamily: "Inter_700Bold", marginTop: 4 },
+  eligSub: { fontSize: 11, color: "#7A95AD", fontFamily: "Inter_400Regular", marginTop: 4 },
 
   ratioGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 },
-  ratioTile: { width: "31%", flexGrow: 1, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 12, alignItems: "center", gap: 5 },
-  ratioVal: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#E8F4FF" },
+  ratioTile: { width: "31%", flexGrow: 1, borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", padding: 12, alignItems: "center", gap: 5 },
+  ratioVal: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#E5ECF5" },
   ratioLabel: { fontSize: 9, fontFamily: "Inter_500Medium", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3 },
   ratioDot: { width: 5, height: 5, borderRadius: 3 },
 
   marginRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
-  marginCard: { flex: 1, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 14, alignItems: "center", gap: 6 },
-  marginLabel: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.4 },
+  marginCard: { flex: 1, borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", padding: 14, alignItems: "center", gap: 6 },
+  marginLabel: { fontSize: 10, color: "#7A95AD", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.4 },
   marginValue: { fontSize: 22, fontFamily: "Inter_700Bold" },
 
   actionRow: { flexDirection: "row", gap: 10, marginTop: 4 },
   actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 14, paddingVertical: 13, borderWidth: 1, backgroundColor: "#0C1826" },
-  actionBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  actionBtnText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
 
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.75)", justifyContent: "flex-end" },
-  modalCard: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 16, borderWidth: 1, borderColor: "#1E3A54" },
-  modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#E8F4FF" },
-  modalInput: { backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: "#E8F4FF", fontFamily: "Inter_400Regular" },
+  modalCard: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 12, borderWidth: 1, borderColor: "#1E3044" },
+  modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#E5ECF5" },
+  modalInput: { backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", paddingHorizontal: 16, paddingVertical: 14, fontSize: 11, color: "#E5ECF5", fontFamily: "Inter_400Regular" },
   modalBtns: { flexDirection: "row", gap: 12 },
-  modalCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", alignItems: "center" },
-  modalCancelText: { fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A9BB5" },
+  modalCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", alignItems: "center" },
+  modalCancelText: { fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A95AD" },
   modalSaveBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: "center" },
   modalSaveText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

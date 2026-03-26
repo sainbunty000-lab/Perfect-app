@@ -17,8 +17,8 @@ import { LineChart, BarChart, PieChart, ChartLegend, HorizontalBarChart, compact
 import { PageBackground, PageHeader, GlassCard, UploadZone, GradientButton, CardTitle, TabNavBar } from "@/components/UI";
 
 const C = Colors.light;
-const GREEN = "#10B981";
-const TEAL  = "#4A9EFF";
+const GREEN = "#2D8B5F";
+const TEAL  = "#5B8DB8";
 const AMBER = "#F59E0B";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -278,7 +278,7 @@ export default function MultiYearScreen() {
 
         {/* ── Year slots ──────────────────────────────────────────── */}
         {slots.map((slot, i) => (
-          <LinearGradient key={i} colors={["#1A2C42", "#152236"]} style={styles.yearCard}>
+          <LinearGradient key={i} colors={["#15202F", "#152236"]} style={styles.yearCard}>
             {/* Year header / toggle */}
             <TouchableOpacity
               style={styles.yearHeader}
@@ -302,7 +302,7 @@ export default function MultiYearScreen() {
               </View>
               <Feather
                 name={expanded[i] ? "chevron-up" : "chevron-down"}
-                size={18} color="#4A6A84"
+                size={18} color="#3D5A6E"
               />
             </TouchableOpacity>
 
@@ -410,7 +410,7 @@ export default function MultiYearScreen() {
                 <View style={styles.chartTopRow}>
                   <CardTitle>Revenue Trend</CardTitle>
                   {salesTrend && (
-                    <View style={[styles.trendBadge, { backgroundColor: salesTrend.up ? "#10B98122" : "#EF444422" }]}>
+                    <View style={[styles.trendBadge, { backgroundColor: salesTrend.up ? "#2D8B5F22" : "#EF444422" }]}>
                       <Feather name={salesTrend.up ? "trending-up" : "trending-down"} size={12} color={salesTrend.up ? GREEN : C.danger} />
                       <Text style={[styles.trendText, { color: salesTrend.up ? GREEN : C.danger }]}>
                         {salesTrend.up ? "+" : ""}{salesTrend.pct}%
@@ -498,9 +498,9 @@ export default function MultiYearScreen() {
                   <Text style={myStyles.chartBoxTitle}>Revenue vs Profit vs COGS</Text>
                   <BarChart
                     datasets={[
-                      { label: "Sales", color: "#4A9EFF", values: salesVals },
+                      { label: "Sales", color: "#5B8DB8", values: salesVals },
                       { label: "COGS",  color: "#EF4444", values: cogsVals },
-                      { label: "Profit", color: "#10B981", values: profitVals },
+                      { label: "Profit", color: "#2D8B5F", values: profitVals },
                     ]}
                     labels={slots.map(s => s.data.label.replace("FY ", ""))}
                     width={300}
@@ -531,16 +531,16 @@ export default function MultiYearScreen() {
 
     <Modal visible={saveModal} transparent animationType="slide" onRequestClose={() => setSaveModal(false)}>
       <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "#00000088" }}>
-        <LinearGradient colors={["#1A2C42", "#111F30"]} style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16 }}>
-          <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#E8F0F8", textAlign: "center" }}>Save Multi-Year Case</Text>
+        <LinearGradient colors={["#15202F", "#0F1A2B"]} style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 }}>
+          <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#E5ECF5", textAlign: "center" }}>Save Multi-Year Case</Text>
           <TextInput
-            style={{ backgroundColor: "#0D1B2A", borderRadius: 14, padding: 14, fontSize: 14, fontFamily: "Inter_500Medium", color: "#E8F0F8", borderWidth: 1, borderColor: "#1E3A54" }}
-            placeholder="Client / Company Name" placeholderTextColor="#3D5A74"
+            style={{ backgroundColor: "#0B1426", borderRadius: 14, padding: 14, fontSize: 14, fontFamily: "Inter_500Medium", color: "#E5ECF5", borderWidth: 1, borderColor: "#1E3044" }}
+            placeholder="Client / Company Name" placeholderTextColor="#354D62"
             value={clientName} onChangeText={setClientName} autoFocus
           />
           <View style={{ flexDirection: "row", gap: 12 }}>
-            <TouchableOpacity style={{ flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", alignItems: "center" }} onPress={() => setSaveModal(false)}>
-              <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A9BB5" }}>Cancel</Text>
+            <TouchableOpacity style={{ flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", alignItems: "center" }} onPress={() => setSaveModal(false)}>
+              <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A95AD" }}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={{ flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: "center", backgroundColor: GREEN }} onPress={handleSave} disabled={saving}>
               {saving ? <ActivityIndicator size="small" color="#000" />
@@ -633,20 +633,20 @@ function MultiYearFinalSummary({ slots }: { slots: { data: YearData }[] }) {
 }
 
 const myStyles = StyleSheet.create({
-  chartBox: { alignItems: "center", gap: 8, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 14 },
-  chartBoxTitle: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#7A9BB5", textTransform: "uppercase", letterSpacing: 0.8, alignSelf: "flex-start" },
+  chartBox: { alignItems: "center", gap: 8, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", padding: 14 },
+  chartBoxTitle: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#7A95AD", textTransform: "uppercase", letterSpacing: 0.8, alignSelf: "flex-start" },
   sumWrap: { gap: 10, marginTop: 4 },
   sumHeader: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
   sumVerdict: { fontSize: 14, fontFamily: "Inter_700Bold" },
-  sumSub: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 2 },
+  sumSub: { fontSize: 10, color: "#7A95AD", fontFamily: "Inter_400Regular", marginTop: 2 },
   sumMetrics: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  metricItem: { flex: 1, minWidth: "40%", backgroundColor: "#0C1826", borderRadius: 12, borderWidth: 1, borderColor: "#1E3A54", padding: 12, alignItems: "center", gap: 4 },
+  metricItem: { flex: 1, minWidth: "40%", backgroundColor: "#0C1826", borderRadius: 12, borderWidth: 1, borderColor: "#1E3044", padding: 12, alignItems: "center", gap: 4 },
   metricVal: { fontSize: 20, fontFamily: "Inter_700Bold" },
-  metricLabel: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_400Regular", textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center" },
-  recBox: { backgroundColor: "#0A1628", borderRadius: 12, borderWidth: 1, borderColor: C.primary + "30", padding: 12, gap: 8 },
+  metricLabel: { fontSize: 10, color: "#7A95AD", fontFamily: "Inter_400Regular", textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center" },
+  recBox: { backgroundColor: "#080F1E", borderRadius: 12, borderWidth: 1, borderColor: C.primary + "30", padding: 12, gap: 8 },
   recHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   recTitle: { fontSize: 10, fontFamily: "Inter_700Bold", color: C.primary, textTransform: "uppercase", letterSpacing: 0.8 },
-  recText: { fontSize: 12, color: "#8BAFC9", fontFamily: "Inter_400Regular", lineHeight: 18 },
+  recText: { fontSize: 12, color: "#8A9DB5", fontFamily: "Inter_400Regular", lineHeight: 18 },
 });
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -676,8 +676,8 @@ function TableRow({ label, vals, format }: { label: string; vals: (number | unde
           style={[
             styles.tableCell, styles.tableValCol, styles.rowVal,
             i === vals.length - 1 && numbers.length >= 2
-              ? { color: growing ? "#10B981" : "#F87171" }
-              : { color: "#C8DDF0" },
+              ? { color: growing ? "#2D8B5F" : "#F87171" }
+              : { color: "#B8CCE0" },
           ]}
         >
           {v !== undefined ? format(v) : "—"}
@@ -688,44 +688,44 @@ function TableRow({ label, vals, format }: { label: string; vals: (number | unde
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 16, gap: 16 },
+  scroll: { paddingHorizontal: 16, gap: 12 },
 
-  howToCard: { flexDirection: "row", alignItems: "flex-start", gap: 10, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#10B98133" },
-  howToText: { flex: 1, fontSize: 12, color: "#7A9BB5", fontFamily: "Inter_400Regular", lineHeight: 18 },
+  howToCard: { flexDirection: "row", alignItems: "flex-start", gap: 10, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#2D8B5F33" },
+  howToText: { flex: 1, fontSize: 12, color: "#7A95AD", fontFamily: "Inter_400Regular", lineHeight: 18 },
 
-  yearCard: { borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54", overflow: "hidden" },
+  yearCard: { borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", overflow: "hidden" },
   yearHeader: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16 },
   yearBadge: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   yearNum: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  yearLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#E8F4FF" },
-  yearStatus: { fontSize: 11, color: "#4A6A84", fontFamily: "Inter_400Regular", marginTop: 2 },
+  yearLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#E5ECF5" },
+  yearStatus: { fontSize: 11, color: "#3D5A6E", fontFamily: "Inter_400Regular", marginTop: 2 },
   yearBody: { paddingHorizontal: 16, paddingBottom: 16, gap: 8 },
 
-  docTypeLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#7A9BB5", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 },
+  docTypeLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#7A95AD", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 },
 
   miniGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
   miniField: { backgroundColor: "#0C1826", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, gap: 2 },
-  miniLabel: { fontSize: 9, color: "#4A6A84", fontFamily: "Inter_400Regular" },
-  miniValue: { fontSize: 12, color: "#C8DDF0", fontFamily: "Inter_600SemiBold" },
+  miniLabel: { fontSize: 9, color: "#3D5A6E", fontFamily: "Inter_400Regular" },
+  miniValue: { fontSize: 12, color: "#B8CCE0", fontFamily: "Inter_600SemiBold" },
 
   chartTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
   trendBadge: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   trendText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
 
-  tableHeader: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#1E3A54", paddingBottom: 8, marginBottom: 4 },
+  tableHeader: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#1E3044", paddingBottom: 8, marginBottom: 4 },
   tableRow: { flexDirection: "row", paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: "#0F1E30" },
   tableCell: { fontFamily: "Inter_400Regular" },
-  tableLabelCol: { flex: 1.2, fontSize: 11, color: "#7A9BB5" },
+  tableLabelCol: { flex: 1.2, fontSize: 11, color: "#7A95AD" },
   tableValCol: { flex: 1, textAlign: "right", fontSize: 11 },
   rowLabel: { fontFamily: "Inter_500Medium" },
   rowVal: { fontFamily: "Inter_600SemiBold" },
 
-  ratioHint: { fontSize: 10, color: "#4A6A84", fontFamily: "Inter_400Regular", marginTop: 10, lineHeight: 15 },
+  ratioHint: { fontSize: 10, color: "#3D5A6E", fontFamily: "Inter_400Regular", marginTop: 10, lineHeight: 15 },
 
-  summaryCard: { borderRadius: 18, borderWidth: 1, borderColor: "#10B98133", padding: 16, gap: 8 },
+  summaryCard: { borderRadius: 18, borderWidth: 1, borderColor: "#2D8B5F33", padding: 16, gap: 8 },
   summaryTitle: { fontSize: 12, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 },
-  summaryRow: { flexDirection: "row", alignItems: "center", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#10B98115" },
-  summaryYear: { fontSize: 12, color: "#C8DDF0", fontFamily: "Inter_500Medium" },
+  summaryRow: { flexDirection: "row", alignItems: "center", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#2D8B5F15" },
+  summaryYear: { fontSize: 12, color: "#B8CCE0", fontFamily: "Inter_500Medium" },
   summaryVal: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 });
 

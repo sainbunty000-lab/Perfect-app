@@ -50,7 +50,7 @@ export default function SavedCasesScreen() {
     <PageBackground style={{ flex: 1 }}>
       {/* Header */}
       <LinearGradient
-        colors={["#0F1E30", "#0A1628"]}
+        colors={["#0F1E30", "#080F1E"]}
         style={[styles.header, { paddingTop: insets.top + 16 }]}
       >
         <Text style={styles.brand}>DHANUSH ENTERPRISES</Text>
@@ -99,7 +99,7 @@ export default function SavedCasesScreen() {
             working_capital: { color: C.secondary, icon: "bar-chart-2", label: "Working Capital" },
             banking: { color: C.accent, icon: "activity", label: "Banking" },
             multi_year: { color: C.success, icon: "trending-up", label: "Multi-Year" },
-            gst_itr: { color: "#A855F7", icon: "file-text", label: "GST & ITR" },
+            gst_itr: { color: "#8B6CC1", icon: "file-text", label: "GST & ITR" },
           };
           const info = caseMap[item.caseType] ?? { color: C.primary, icon: "folder", label: item.caseType };
           const iconColor = info.color;
@@ -118,7 +118,7 @@ export default function SavedCasesScreen() {
 
           return (
             <LinearGradient
-              colors={["#1A2C42", "#142030"]}
+              colors={["#15202F", "#111B26"]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={styles.card}
             >
@@ -180,8 +180,8 @@ const styles = StyleSheet.create({
     letterSpacing: 2.5, marginBottom: 10, textTransform: "uppercase",
   },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  title: { fontSize: 28, fontFamily: "Inter_700Bold", color: "#E8F4FF" },
-  subtitle: { fontSize: 13, color: "#7A9BB5", marginTop: 3, fontFamily: "Inter_400Regular" },
+  title: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#E5ECF5" },
+  subtitle: { fontSize: 11, color: "#7A95AD", marginTop: 3, fontFamily: "Inter_400Regular" },
   countBadge: {
     width: 52, height: 52, borderRadius: 14, borderWidth: 1,
     alignItems: "center", justifyContent: "center",
@@ -191,13 +191,13 @@ const styles = StyleSheet.create({
 
   list: { paddingHorizontal: 16, paddingTop: 16, gap: 12 },
 
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 14 },
-  emptyIcon: { width: 80, height: 80, borderRadius: 20, backgroundColor: "#131F30", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#1E3048" },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 10 },
+  emptyIcon: { width: 80, height: 80, borderRadius: 14, backgroundColor: "#131F30", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#1E3048" },
   emptyTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: "#4A6478" },
-  emptyText: { fontSize: 13, color: "#3D5A74", fontFamily: "Inter_400Regular", textAlign: "center", paddingHorizontal: 40, lineHeight: 20 },
+  emptyText: { fontSize: 11, color: "#354D62", fontFamily: "Inter_400Regular", textAlign: "center", paddingHorizontal: 40, lineHeight: 20 },
 
   card: {
-    borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54",
+    borderRadius: 14, borderWidth: 1, borderColor: "#1E3044",
     overflow: "hidden", padding: 16, gap: 12,
   },
   cardBar: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 },
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   cardInfo: { flex: 1 },
-  cardName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#E8F4FF" },
+  cardName: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#E5ECF5" },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 5 },
   typePill: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
   typeText: { fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.4 },

@@ -49,7 +49,7 @@ class ResultsErrorBoundary extends Component<
     if (this.state.error) {
       return (
         <View style={{ backgroundColor: "#1A0000", borderRadius: 14, padding: 16, gap: 8 }}>
-          <Text style={{ color: "#EF4444", fontFamily: "Inter_700Bold", fontSize: 13 }}>
+          <Text style={{ color: "#EF4444", fontFamily: "Inter_700Bold", fontSize: 11 }}>
             Results render error — please report this:
           </Text>
           <Text style={{ color: "#FF9999", fontFamily: "Inter_400Regular", fontSize: 11 }}>
@@ -253,7 +253,7 @@ export default function BankingScreen() {
               onPress={handleCalculate}
               label="Analyze Banking Performance"
               icon="activity"
-              colors={[C.accent, "#D4A800"]}
+              colors={[C.accent, "#D4A853"]}
               textColor="#000"
             />
             {!slot && (
@@ -354,11 +354,11 @@ export default function BankingScreen() {
                 <View style={{ flex: 1 }}>
                   <HorizontalBarChart
                     items={[
-                      { label: "Liquidity",   value: results.liquidityPosition     === "Strong" ? 90 : results.liquidityPosition  === "Adequate" ? 65 : 35, max: 100, color: "#4A9EFF",  format: (v) => `${v}%` },
-                      { label: "Cash Flow",   value: results.cashFlowPosition      === "Strong" ? 90 : results.cashFlowPosition   === "Adequate" ? 65 : 35, max: 100, color: "#10B981",  format: (v) => `${v}%` },
-                      { label: "Credit",      value: results.creditworthiness      === "Strong" ? 90 : results.creditworthiness   === "Adequate" ? 65 : 35, max: 100, color: "#D4A800",  format: (v) => `${v}%` },
-                      { label: "Repayment",   value: results.repaymentCapacity     === "Strong" ? 90 : results.repaymentCapacity  === "Adequate" ? 65 : 35, max: 100, color: "#A855F7",  format: (v) => `${v}%` },
-                      { label: "Stability",   value: results.financialStability    === "Strong" ? 90 : results.financialStability === "Adequate" ? 65 : 35, max: 100, color: "#20B2AA",  format: (v) => `${v}%` },
+                      { label: "Liquidity",   value: results.liquidityPosition     === "Strong" ? 90 : results.liquidityPosition  === "Adequate" ? 65 : 35, max: 100, color: "#5B8DB8",  format: (v) => `${v}%` },
+                      { label: "Cash Flow",   value: results.cashFlowPosition      === "Strong" ? 90 : results.cashFlowPosition   === "Adequate" ? 65 : 35, max: 100, color: "#2D8B5F",  format: (v) => `${v}%` },
+                      { label: "Credit",      value: results.creditworthiness      === "Strong" ? 90 : results.creditworthiness   === "Adequate" ? 65 : 35, max: 100, color: "#D4A853",  format: (v) => `${v}%` },
+                      { label: "Repayment",   value: results.repaymentCapacity     === "Strong" ? 90 : results.repaymentCapacity  === "Adequate" ? 65 : 35, max: 100, color: "#8B6CC1",  format: (v) => `${v}%` },
+                      { label: "Stability",   value: results.financialStability    === "Strong" ? 90 : results.financialStability === "Adequate" ? 65 : 35, max: 100, color: "#2E6DAB",  format: (v) => `${v}%` },
                     ]}
                   />
                 </View>
@@ -389,11 +389,11 @@ export default function BankingScreen() {
 
       <Modal visible={saveModal} transparent animationType="slide" onRequestClose={() => setSaveModal(false)}>
         <View style={styles.modalOverlay}>
-          <LinearGradient colors={["#1A2C42", "#111F30"]} style={styles.modalCard}>
+          <LinearGradient colors={["#15202F", "#0F1A2B"]} style={styles.modalCard}>
             <Text style={styles.modalTitle}>Save Banking Case</Text>
             <TextInput
               style={styles.modalInput} placeholder="Client / Company Name"
-              placeholderTextColor="#3D5A74" value={clientName}
+              placeholderTextColor="#354D62" value={clientName}
               onChangeText={setClientName} autoFocus
             />
             <View style={styles.modalBtns}>
@@ -465,7 +465,7 @@ function BankingFinalSummary({ results }: { results: BankingResults }) {
           <Text style={bSumS.sectionTitle}>Strengths</Text>
           {strengths.map((s, i) => (
             <View key={i} style={bSumS.row}>
-              <Feather name="check-circle" size={13} color="#10B981" />
+              <Feather name="check-circle" size={13} color="#2D8B5F" />
               <Text style={bSumS.rowText}>{s}</Text>
             </View>
           ))}
@@ -496,7 +496,7 @@ function BankingFinalSummary({ results }: { results: BankingResults }) {
 }
 
 const bStyles = StyleSheet.create({
-  chartRow: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 14 },
+  chartRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", padding: 14 },
 });
 
 const bSumS = StyleSheet.create({
@@ -505,15 +505,15 @@ const bSumS = StyleSheet.create({
   gradeCircle: { width: 48, height: 48, borderRadius: 14, borderWidth: 2, alignItems: "center", justifyContent: "center" },
   gradeText: { fontSize: 26, fontFamily: "Inter_700Bold" },
   verdictText: { fontSize: 12, fontFamily: "Inter_700Bold", lineHeight: 17 },
-  verdictSub: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 2 },
-  section: { backgroundColor: "#0C1826", borderRadius: 12, borderWidth: 1, borderColor: "#1E3A54", padding: 12, gap: 8 },
-  sectionTitle: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#10B981", textTransform: "uppercase", letterSpacing: 0.8 },
+  verdictSub: { fontSize: 10, color: "#7A95AD", fontFamily: "Inter_400Regular", marginTop: 2 },
+  section: { backgroundColor: "#0C1826", borderRadius: 12, borderWidth: 1, borderColor: "#1E3044", padding: 12, gap: 8 },
+  sectionTitle: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#2D8B5F", textTransform: "uppercase", letterSpacing: 0.8 },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   rowText: { flex: 1, fontSize: 12, color: "#9BBDD4", fontFamily: "Inter_400Regular", lineHeight: 17 },
-  recBox: { backgroundColor: "#0A1628", borderRadius: 12, borderWidth: 1, borderColor: withAlpha(C.primary, 0.19), padding: 12, gap: 8 },
+  recBox: { backgroundColor: "#080F1E", borderRadius: 12, borderWidth: 1, borderColor: withAlpha(C.primary, 0.19), padding: 12, gap: 8 },
   recHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   recTitle: { fontSize: 10, fontFamily: "Inter_700Bold", color: C.primary, textTransform: "uppercase", letterSpacing: 0.8 },
-  recText: { fontSize: 12, color: "#8BAFC9", fontFamily: "Inter_400Regular", lineHeight: 18 },
+  recText: { fontSize: 12, color: "#8A9DB5", fontFamily: "Inter_400Regular", lineHeight: 18 },
 });
 
 function InputRow({ label, value, onChangeText }: { label: string; value: string; onChangeText: (v: string) => void }) {
@@ -522,7 +522,7 @@ function InputRow({ label, value, onChangeText }: { label: string; value: string
       <Text style={styles.inputLabel}>{label}</Text>
       <TextInput
         style={styles.input} value={value} onChangeText={onChangeText}
-        keyboardType="numeric" placeholder="0" placeholderTextColor="#3D5A74" returnKeyType="done"
+        keyboardType="numeric" placeholder="0" placeholderTextColor="#354D62" returnKeyType="done"
       />
     </View>
   );
@@ -534,7 +534,7 @@ function StatusBadge({ label, value }: { label: string; value: string | undefine
   const bad  = ["Weak", "Negative", "High", "Insufficient", "Unstable", "Irregular"].includes(value);
   const color = good ? C.success : bad ? C.danger : C.warning;
   return (
-    <LinearGradient colors={["#1A2C42", "#152236"]} style={styles.badge}>
+    <LinearGradient colors={["#15202F", "#152236"]} style={styles.badge}>
       <Text style={styles.badgeLabel}>{label}</Text>
       <View style={[styles.badgeTag, { backgroundColor: withAlpha(color, 0.15) }]}>
         <Text style={[styles.badgeValue, { color }]}>{value}</Text>
@@ -544,52 +544,52 @@ function StatusBadge({ label, value }: { label: string; value: string | undefine
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 16, gap: 16 },
-  analyzeHint: { fontSize: 11, color: "#4A6A84", fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 10, lineHeight: 17 },
+  scroll: { paddingHorizontal: 16, gap: 12 },
+  analyzeHint: { fontSize: 11, color: "#3D5A6E", fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 10, lineHeight: 17 },
   manualToggle: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 14, paddingVertical: 8, borderTopWidth: 1, borderTopColor: "#1A2F45" },
   manualToggleText: { fontSize: 12, fontFamily: "Inter_500Medium" },
 
-  sectionHint: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginBottom: 12, lineHeight: 17 },
+  sectionHint: { fontSize: 11, color: "#7A95AD", fontFamily: "Inter_400Regular", marginBottom: 12, lineHeight: 17 },
   metaBox: { marginTop: 10, gap: 5, backgroundColor: "#0C1826", borderRadius: 10, padding: 10 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 7 },
-  metaText: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular" },
+  metaText: { fontSize: 11, color: "#7A95AD", fontFamily: "Inter_400Regular" },
 
   inputRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  inputLabel: { flex: 1, fontSize: 12, color: "#7A9BB5", fontFamily: "Inter_400Regular" },
+  inputLabel: { flex: 1, fontSize: 12, color: "#7A95AD", fontFamily: "Inter_400Regular" },
   input: {
     width: 116, textAlign: "right",
-    backgroundColor: "#0C1826", borderWidth: 1, borderColor: "#1E3A54",
+    backgroundColor: "#0C1826", borderWidth: 1, borderColor: "#1E3044",
     borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8,
-    fontSize: 13, color: "#E8F4FF", fontFamily: "Inter_500Medium",
+    fontSize: 11, color: "#E5ECF5", fontFamily: "Inter_500Medium",
   },
 
-  scoreCard: { borderRadius: 20, padding: 20, borderWidth: 1, borderColor: "#1E3A54", flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  scoreCard: { borderRadius: 14, padding: 16, borderWidth: 1, borderColor: "#1E3044", flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   scoreLeft: { flex: 1, gap: 8 },
-  assessLabel: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.5 },
-  assessText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#E8F4FF" },
+  assessLabel: { fontSize: 10, color: "#7A95AD", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.5 },
+  assessText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#E5ECF5" },
   riskBadge: { alignSelf: "flex-start", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   riskText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   scoreRight: { alignItems: "center" },
   scoreNum: { fontSize: 52, fontFamily: "Inter_700Bold", lineHeight: 56 },
-  scoreMax: { fontSize: 12, color: "#7A9BB5", fontFamily: "Inter_400Regular", textAlign: "center" },
+  scoreMax: { fontSize: 12, color: "#7A95AD", fontFamily: "Inter_400Regular", textAlign: "center" },
 
   badgeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  badge: { width: "47%", flexGrow: 1, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: "#1E3A54", gap: 8 },
-  badgeLabel: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.3 },
+  badge: { width: "47%", flexGrow: 1, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: "#1E3044", gap: 8 },
+  badgeLabel: { fontSize: 10, color: "#7A95AD", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.3 },
   badgeTag: { alignSelf: "flex-start", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   badgeValue: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 
   actionRow: { flexDirection: "row", gap: 12 },
   actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 13, borderWidth: 1, backgroundColor: "#131F30" },
-  actionBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  actionBtnText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
 
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.75)", justifyContent: "flex-end" },
-  modalCard: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 16, borderWidth: 1, borderColor: "#1E3A54" },
-  modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#E8F4FF" },
-  modalInput: { backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: "#E8F4FF", fontFamily: "Inter_400Regular" },
+  modalCard: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 12, borderWidth: 1, borderColor: "#1E3044" },
+  modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#E5ECF5" },
+  modalInput: { backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", paddingHorizontal: 16, paddingVertical: 14, fontSize: 11, color: "#E5ECF5", fontFamily: "Inter_400Regular" },
   modalBtns: { flexDirection: "row", gap: 12 },
-  modalCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", alignItems: "center" },
-  modalCancelText: { fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A9BB5" },
+  modalCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", alignItems: "center" },
+  modalCancelText: { fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A95AD" },
   modalSaveBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: "center" },
   modalSaveText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });

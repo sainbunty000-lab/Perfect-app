@@ -36,9 +36,9 @@ function formatDate(ts: string | number | null | undefined) {
 }
 
 const TYPE_COLOR: Record<string, string> = {
-  working_capital: "#4A9EFF",
-  banking:         "#D4A800",
-  gst_itr:         "#A855F7",
+  working_capital: "#5B8DB8",
+  banking:         "#D4A853",
+  gst_itr:         "#8B6CC1",
   multi_year:      "#10B981",
 };
 const TYPE_LABEL: Record<string, string> = {
@@ -134,7 +134,7 @@ export default function DashboardScreen() {
       >
         {/* ── Header ──────────────────────────────────────────────── */}
         <LinearGradient
-          colors={["#0B2540", "#0A1628"]}
+          colors={["#0B2540", "#080F1E"]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={styles.header}
         >
@@ -157,7 +157,7 @@ export default function DashboardScreen() {
           {/* Quick status pills */}
           <View style={styles.headerPills}>
             <Pill icon="database" label={`${total} Total Cases`}    color={C.primary} />
-            <Pill icon="zap"      label="Live Data"                  color="#F5C842" />
+            <Pill icon="zap"      label="Live Data"                  color="#D4A853" />
             <Pill icon="check"    label={isLoading ? "Syncing…" : "Up to date"} color="#10B981" />
           </View>
         </LinearGradient>
@@ -167,15 +167,15 @@ export default function DashboardScreen() {
         <View style={styles.kpiGrid}>
           <KpiCard
             label="Total Cases"  value={String(total)}
-            icon="folder"        color="#20B2AA"   wide
+            icon="folder"        color="#2E6DAB"   wide
           />
           <KpiCard
             label="WC Analysis"  value={String(byType["working_capital"] ?? 0)}
-            icon="bar-chart-2"   color="#4A9EFF"
+            icon="bar-chart-2"   color="#5B8DB8"
           />
           <KpiCard
             label="Banking"      value={String(byType["banking"] ?? 0)}
-            icon="credit-card"   color="#D4A800"
+            icon="credit-card"   color="#D4A853"
           />
           <KpiCard
             label="Multi-Year"   value={String(byType["multi_year"] ?? 0)}
@@ -183,7 +183,7 @@ export default function DashboardScreen() {
           />
           <KpiCard
             label="GST & ITR"    value={String(byType["gst_itr"] ?? 0)}
-            icon="file-text"     color="#A855F7"
+            icon="file-text"     color="#8B6CC1"
           />
         </View>
 
@@ -199,7 +199,7 @@ export default function DashboardScreen() {
                 </Text>
               </View>
               <View style={styles.chartRight}>
-                <Text style={[styles.chartLatest, { color: "#4A9EFF" }]}>
+                <Text style={[styles.chartLatest, { color: "#5B8DB8" }]}>
                   {compactINR(wcLatest)}
                 </Text>
                 {wcDelta !== 0 && (
@@ -216,18 +216,18 @@ export default function DashboardScreen() {
                 )}
               </View>
             </View>
-            <MiniSparkline values={wcSpark} color="#4A9EFF" width={chartW} height={64} />
+            <MiniSparkline values={wcSpark} color="#5B8DB8" width={chartW} height={64} />
             <View style={styles.chartFooter}>
               {wcSpark.map((v, i) => (
                 <View key={i} style={styles.chartDot}>
-                  <View style={[styles.dotMark, { backgroundColor: "#4A9EFF" + (i === wcSpark.length - 1 ? "FF" : "50") }]} />
+                  <View style={[styles.dotMark, { backgroundColor: "#5B8DB8" + (i === wcSpark.length - 1 ? "FF" : "50") }]} />
                 </View>
               ))}
             </View>
           </LinearGradient>
         ) : (
           <EmptyChart
-            icon="bar-chart-2" color="#4A9EFF"
+            icon="bar-chart-2" color="#5B8DB8"
             label="No WC data yet" sub="Run a Working Capital analysis to see trends"
             onPress={() => goTo("index")}
           />
@@ -245,17 +245,17 @@ export default function DashboardScreen() {
                 </Text>
               </View>
               <View style={styles.chartRight}>
-                <Text style={[styles.chartLatest, { color: "#D4A800" }]}>
+                <Text style={[styles.chartLatest, { color: "#D4A853" }]}>
                   {bankLatest.toFixed(0)}<Text style={styles.chartUnit}>/100</Text>
                 </Text>
-                <ScoreBar score={bankLatest} color="#D4A800" />
+                <ScoreBar score={bankLatest} color="#D4A853" />
               </View>
             </View>
-            <MiniSparkline values={bankSpark} color="#D4A800" width={chartW} height={64} />
+            <MiniSparkline values={bankSpark} color="#D4A853" width={chartW} height={64} />
           </LinearGradient>
         ) : (
           <EmptyChart
-            icon="credit-card" color="#D4A800"
+            icon="credit-card" color="#D4A853"
             label="No banking data yet" sub="Run a Banking Performance analysis to see scores"
             onPress={() => goTo("banking")}
           />
@@ -339,21 +339,21 @@ export default function DashboardScreen() {
                     label: "Avg Bank Score",
                     value: Math.round(bankAvg),
                     max: 100,
-                    color: "#D4A800",
+                    color: "#D4A853",
                     format: (v: number) => `${v}/100`,
                   }] : []),
                   ...(wcSpark.length > 0 ? [{
                     label: "Max WC Elig.",
                     value: maxWC,
                     max: maxWC * 1.2 || 1,
-                    color: "#4A9EFF",
+                    color: "#5B8DB8",
                     format: compactINR,
                   }] : []),
                   {
                     label: "Total Cases",
                     value: total,
                     max: Math.max(total, 10),
-                    color: "#20B2AA",
+                    color: "#2E6DAB",
                     format: (v: number) => `${v} saved`,
                   },
                 ]}
@@ -374,7 +374,7 @@ export default function DashboardScreen() {
 
         {recent.length === 0 ? (
           <LinearGradient colors={["#112034", "#0D1A2A"]} style={styles.emptyCard}>
-            <Feather name="inbox" size={32} color="#1E3A54" />
+            <Feather name="inbox" size={32} color="#1E3044" />
             <Text style={styles.emptyTitle}>No cases yet</Text>
             <Text style={styles.emptySub}>
               Upload a financial document in any module to begin analysis
@@ -432,10 +432,10 @@ export default function DashboardScreen() {
         <Text style={styles.sectionLabel}>Quick Actions</Text>
         <View style={styles.quickRow}>
           {[
-            { label: "WC Analysis",    name: "index",     color: "#4A9EFF", icon: "bar-chart-2" },
-            { label: "Banking",        name: "banking",   color: "#D4A800", icon: "credit-card" },
+            { label: "WC Analysis",    name: "index",     color: "#5B8DB8", icon: "bar-chart-2" },
+            { label: "Banking",        name: "banking",   color: "#D4A853", icon: "credit-card" },
             { label: "Multi-Year",     name: "multiyear", color: "#10B981", icon: "trending-up" },
-            { label: "GST & ITR",      name: "gst-itr",   color: "#A855F7", icon: "file-text" },
+            { label: "GST & ITR",      name: "gst-itr",   color: "#8B6CC1", icon: "file-text" },
           ].map((q) => (
             <TouchableOpacity
               key={q.name}
@@ -466,7 +466,7 @@ function Pill({ icon, label, color }: { icon: string; label: string; color: stri
   );
 }
 const pillS = StyleSheet.create({
-  wrap: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
+  wrap: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 14, paddingHorizontal: 9, paddingVertical: 4 },
   text: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
 });
 
@@ -505,7 +505,7 @@ function ScoreBar({ score, color }: { score: number; color: string }) {
   );
 }
 const scoreS = StyleSheet.create({
-  bg: { width: 56, height: 4, backgroundColor: "#1E3A54", borderRadius: 2, marginTop: 4 },
+  bg: { width: 56, height: 4, backgroundColor: "#1E3044", borderRadius: 2, marginTop: 4 },
   fill: { height: "100%", borderRadius: 2 },
 });
 
@@ -530,12 +530,12 @@ function EmptyChart({
 
 // ── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 16, gap: 14 },
+  scroll: { paddingHorizontal: 16, gap: 10 },
 
   // Header
   header: {
-    borderRadius: 24, padding: 20, overflow: "hidden",
-    borderWidth: 1, borderColor: "#1E3A54", gap: 12,
+    borderRadius: 24, padding: 16, overflow: "hidden",
+    borderWidth: 1, borderColor: "#1E3044", gap: 12,
   },
   headerGlow: {
     position: "absolute", top: -30, right: -30,
@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
     fontSize: 9, fontFamily: "Inter_700Bold", color: C.primary,
     letterSpacing: 2.2, textTransform: "uppercase",
   },
-  headerTitle: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#E8F4FF", marginTop: 2 },
+  headerTitle: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#E5ECF5", marginTop: 2 },
   headerDate: { fontSize: 11, color: "#6A8FA8", fontFamily: "Inter_400Regular", marginTop: 3 },
   refreshBtn: {
     width: 36, height: 36, borderRadius: 10,
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
 
   // Section labels
   sectionLabel: {
-    fontSize: 10, fontFamily: "Inter_700Bold", color: "#4A6A84",
+    fontSize: 10, fontFamily: "Inter_700Bold", color: "#3D5A6E",
     textTransform: "uppercase", letterSpacing: 1.4, marginTop: 2,
   },
 
@@ -567,11 +567,11 @@ const styles = StyleSheet.create({
 
   // Charts
   chartCard: {
-    borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54",
+    borderRadius: 14, borderWidth: 1, borderColor: "#1E3044",
     padding: 16, gap: 12,
   },
   chartTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  chartTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#C0D8EE" },
+  chartTitle: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#C0D8EE" },
   chartSub: { fontSize: 10, color: "#5A7A94", fontFamily: "Inter_400Regular", marginTop: 2 },
   chartRight: { alignItems: "flex-end" },
   chartLatest: { fontSize: 18, fontFamily: "Inter_700Bold" },
@@ -584,51 +584,51 @@ const styles = StyleSheet.create({
 
   // Empty chart
   emptyChart: {
-    borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54",
+    borderRadius: 14, borderWidth: 1, borderColor: "#1E3044",
     padding: 24, alignItems: "center", gap: 8,
   },
   emptyChartIcon: { width: 50, height: 50, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  emptyChartLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#3D5A74" },
+  emptyChartLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#354D62" },
   emptyChartSub: { fontSize: 11, color: "#2A3D52", fontFamily: "Inter_400Regular", textAlign: "center" },
   emptyChartBtn: { marginTop: 4, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
   emptyChartBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 
   // Distribution breakdown
   breakdownCard: {
-    borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54",
+    borderRadius: 14, borderWidth: 1, borderColor: "#1E3044",
     padding: 16, gap: 12,
   },
   breakRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   breakIcon: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  breakLabel: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#8BAFC9", width: 36 },
-  breakBarBg: { flex: 1, height: 6, backgroundColor: "#1E3A54", borderRadius: 3, overflow: "hidden" },
+  breakLabel: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#8A9DB5", width: 36 },
+  breakBarBg: { flex: 1, height: 6, backgroundColor: "#1E3044", borderRadius: 3, overflow: "hidden" },
   breakBarFill: { height: "100%", borderRadius: 3 },
-  breakCount: { fontSize: 13, fontFamily: "Inter_700Bold", width: 24, textAlign: "right" },
-  breakPct: { fontSize: 10, color: "#4A6A84", fontFamily: "Inter_400Regular", width: 30, textAlign: "right" },
+  breakCount: { fontSize: 11, fontFamily: "Inter_700Bold", width: 24, textAlign: "right" },
+  breakPct: { fontSize: 10, color: "#3D5A6E", fontFamily: "Inter_400Regular", width: 30, textAlign: "right" },
 
   // Recent activity
   recentHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   seeAll: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.primary },
   recentCard: {
-    borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54", overflow: "hidden",
+    borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", overflow: "hidden",
   },
   recentRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
   recentBadge: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  recentName: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#D0E8FF" },
+  recentName: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#D0E8FF" },
   recentHighlight: { fontSize: 11, fontFamily: "Inter_500Medium", marginTop: 1 },
   recentType: { fontSize: 11, fontFamily: "Inter_500Medium", marginTop: 1 },
-  recentDate: { fontSize: 10, color: "#3D5A74", fontFamily: "Inter_400Regular" },
-  divider: { height: 1, backgroundColor: "#142030", marginHorizontal: 14 },
+  recentDate: { fontSize: 10, color: "#354D62", fontFamily: "Inter_400Regular" },
+  divider: { height: 1, backgroundColor: "#111B26", marginHorizontal: 14 },
 
   // Empty state
   emptyCard: {
-    borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54",
+    borderRadius: 14, borderWidth: 1, borderColor: "#1E3044",
     padding: 32, alignItems: "center", gap: 8,
   },
-  emptyTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#2D4A62" },
+  emptyTitle: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#2D4A62" },
   emptySub: { fontSize: 12, color: "#1E3250", fontFamily: "Inter_400Regular", textAlign: "center" },
   emptyBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
-  emptyBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  emptyBtnText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
 
   // Quick actions
   quickRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },

@@ -21,8 +21,8 @@ import {
 import { DonutGauge, PieChart, HorizontalBarChart } from "@/lib/charts";
 
 const C = Colors.light;
-const PURPLE = "#A855F7";
-const BLUE   = "#4A9EFF";
+const PURPLE = "#8B6CC1";
+const BLUE   = "#5B8DB8";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface GstrFields {
@@ -467,7 +467,7 @@ export default function GstItrScreen() {
                   <DonutGauge
                     value={result.complianceScore}
                     max={100}
-                    color={result.complianceScore >= 80 ? "#10B981" : result.complianceScore >= 60 ? "#F5C842" : "#EF4444"}
+                    color={result.complianceScore >= 80 ? "#2D8B5F" : result.complianceScore >= 60 ? "#D4A853" : "#EF4444"}
                     size={90}
                     label="Score"
                   />
@@ -478,7 +478,7 @@ export default function GstItrScreen() {
                         items={[
                           { label: "IGST", value: result.gstr.igstCollected ?? 0, max: Math.max(result.gstr.igstCollected ?? 0, result.gstr.cgstCollected ?? 0, result.gstr.sgstCollected ?? 0, 1), color: PURPLE, format: (v) => "₹" + (v / 1000).toFixed(0) + "K" },
                           { label: "CGST", value: result.gstr.cgstCollected ?? 0, max: Math.max(result.gstr.igstCollected ?? 0, result.gstr.cgstCollected ?? 0, result.gstr.sgstCollected ?? 0, 1), color: BLUE, format: (v) => "₹" + (v / 1000).toFixed(0) + "K" },
-                          { label: "SGST", value: result.gstr.sgstCollected ?? 0, max: Math.max(result.gstr.igstCollected ?? 0, result.gstr.cgstCollected ?? 0, result.gstr.sgstCollected ?? 0, 1), color: "#10B981", format: (v) => "₹" + (v / 1000).toFixed(0) + "K" },
+                          { label: "SGST", value: result.gstr.sgstCollected ?? 0, max: Math.max(result.gstr.igstCollected ?? 0, result.gstr.cgstCollected ?? 0, result.gstr.sgstCollected ?? 0, 1), color: "#2D8B5F", format: (v) => "₹" + (v / 1000).toFixed(0) + "K" },
                         ]}
                       />
                     </View>
@@ -514,16 +514,16 @@ export default function GstItrScreen() {
 
       <Modal visible={saveModal} transparent animationType="slide" onRequestClose={() => setSaveModal(false)}>
         <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "#00000088" }}>
-          <LinearGradient colors={["#1A2C42", "#111F30"]} style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16 }}>
-            <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#E8F0F8", textAlign: "center" }}>Save GST & ITR Case</Text>
+          <LinearGradient colors={["#15202F", "#0F1A2B"]} style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 }}>
+            <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#E5ECF5", textAlign: "center" }}>Save GST & ITR Case</Text>
             <TextInput
-              style={{ backgroundColor: "#0D1B2A", borderRadius: 14, padding: 14, fontSize: 14, fontFamily: "Inter_500Medium", color: "#E8F0F8", borderWidth: 1, borderColor: "#1E3A54" }}
-              placeholder="Client / Company Name" placeholderTextColor="#3D5A74"
+              style={{ backgroundColor: "#0B1426", borderRadius: 14, padding: 14, fontSize: 14, fontFamily: "Inter_500Medium", color: "#E5ECF5", borderWidth: 1, borderColor: "#1E3044" }}
+              placeholder="Client / Company Name" placeholderTextColor="#354D62"
               value={clientName} onChangeText={setClientName} autoFocus
             />
             <View style={{ flexDirection: "row", gap: 12 }}>
-              <TouchableOpacity style={{ flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", alignItems: "center" }} onPress={() => setSaveModal(false)}>
-                <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A9BB5" }}>Cancel</Text>
+              <TouchableOpacity style={{ flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", alignItems: "center" }} onPress={() => setSaveModal(false)}>
+                <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A95AD" }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={{ flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: "center", backgroundColor: PURPLE }} onPress={handleSave} disabled={saving}>
                 {saving ? <ActivityIndicator size="small" color="#fff" />
@@ -550,7 +550,7 @@ function ExtractedRow({ label, value, color }: { label: string; value: string; c
 function MetricTile({ label, value, good, neutral }: { label: string; value: string; good?: boolean; neutral?: boolean }) {
   const color = neutral ? BLUE : good ? C.success : C.warning;
   return (
-    <LinearGradient colors={["#1A2C42", "#152236"]} style={styles.metricTile}>
+    <LinearGradient colors={["#15202F", "#152236"]} style={styles.metricTile}>
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={[styles.metricValue, { color }]}>{value}</Text>
     </LinearGradient>
@@ -561,7 +561,7 @@ function MetricTile({ label, value, good, neutral }: { label: string; value: str
 function GstFinalSummary({ result }: { result: AnalysisResult }) {
   const score = result.complianceScore;
   const grade = result.complianceGrade;
-  const color = score >= 80 ? "#10B981" : score >= 60 ? "#F5C842" : "#EF4444";
+  const color = score >= 80 ? "#2D8B5F" : score >= 60 ? "#D4A853" : "#EF4444";
 
   const verdict = score >= 80 ? "COMPLIANT — EXCELLENT PROFILE"
     : score >= 65 ? "LARGELY COMPLIANT"
@@ -579,8 +579,8 @@ function GstFinalSummary({ result }: { result: AnalysisResult }) {
   const itrMetrics = result.itr ? [
     { label: "Taxable Income",   value: "₹" + ((result.itr.taxableIncome ?? 0) / 100000).toFixed(1) + "L", color: BLUE },
     { label: "Net Tax Liability", value: "₹" + ((result.itr.netTaxLiability ?? 0) / 100000).toFixed(1) + "L", color: PURPLE },
-    result.itr.refundAmount ? { label: "Refund",         value: "₹" + ((result.itr.refundAmount ?? 0) / 100000).toFixed(1) + "L", color: "#10B981" } : null,
-    result.effectiveTaxRate ? { label: "Eff. Tax Rate",  value: result.effectiveTaxRate.toFixed(1) + "%", color: "#F5C842" } : null,
+    result.itr.refundAmount ? { label: "Refund",         value: "₹" + ((result.itr.refundAmount ?? 0) / 100000).toFixed(1) + "L", color: "#2D8B5F" } : null,
+    result.effectiveTaxRate ? { label: "Eff. Tax Rate",  value: result.effectiveTaxRate.toFixed(1) + "%", color: "#D4A853" } : null,
   ].filter(Boolean) as { label: string; value: string; color: string }[] : [];
 
   return (
@@ -621,7 +621,7 @@ function GstFinalSummary({ result }: { result: AnalysisResult }) {
 }
 
 const gstStyles = StyleSheet.create({
-  chartRow: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 14 },
+  chartRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#0C1826", borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", padding: 14 },
 });
 
 const gstSumS = StyleSheet.create({
@@ -630,42 +630,42 @@ const gstSumS = StyleSheet.create({
   grade: { width: 46, height: 46, borderRadius: 12, borderWidth: 2, alignItems: "center", justifyContent: "center" },
   gradeText: { fontSize: 24, fontFamily: "Inter_700Bold" },
   verdictText: { fontSize: 12, fontFamily: "Inter_700Bold", lineHeight: 16 },
-  verdictSub: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_400Regular", marginTop: 2 },
+  verdictSub: { fontSize: 10, color: "#7A95AD", fontFamily: "Inter_400Regular", marginTop: 2 },
   metricsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  metricItem: { flex: 1, minWidth: "40%", backgroundColor: "#0C1826", borderRadius: 12, borderWidth: 1, borderColor: "#1E3A54", padding: 10, alignItems: "center", gap: 4 },
+  metricItem: { flex: 1, minWidth: "40%", backgroundColor: "#0C1826", borderRadius: 12, borderWidth: 1, borderColor: "#1E3044", padding: 10, alignItems: "center", gap: 4 },
   metricVal: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  metricLabel: { fontSize: 9, color: "#7A9BB5", fontFamily: "Inter_400Regular", textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center" },
-  recBox: { backgroundColor: "#0A1628", borderRadius: 12, borderWidth: 1, borderColor: C.primary + "30", padding: 12, gap: 8 },
+  metricLabel: { fontSize: 9, color: "#7A95AD", fontFamily: "Inter_400Regular", textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center" },
+  recBox: { backgroundColor: "#080F1E", borderRadius: 12, borderWidth: 1, borderColor: C.primary + "30", padding: 12, gap: 8 },
   recHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   recTitle: { fontSize: 10, fontFamily: "Inter_700Bold", color: C.primary, textTransform: "uppercase", letterSpacing: 0.8 },
-  recText: { fontSize: 12, color: "#8BAFC9", fontFamily: "Inter_400Regular", lineHeight: 18 },
+  recText: { fontSize: 12, color: "#8A9DB5", fontFamily: "Inter_400Regular", lineHeight: 18 },
 });
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 16, gap: 14 },
+  scroll: { paddingHorizontal: 16, gap: 10 },
 
   sectionHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 12 },
   sectionBadge: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   sectionBadgeText: { fontSize: 12, fontFamily: "Inter_700Bold" },
-  sectionSubtitle: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular" },
+  sectionSubtitle: { fontSize: 11, color: "#7A95AD", fontFamily: "Inter_400Regular" },
 
   extractedBox: { marginTop: 12, backgroundColor: "#0C1826", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#1A2F45" },
   extractedTitle: { fontSize: 10, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 10 },
   dataRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: "#1A2C3A" },
-  dataLabel: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular" },
+  dataLabel: { fontSize: 11, color: "#7A95AD", fontFamily: "Inter_400Regular" },
   dataValue: { fontSize: 11, fontFamily: "Inter_600SemiBold", maxWidth: "55%", textAlign: "right" },
 
-  scoreCard: { borderRadius: 20, padding: 20, borderWidth: 1, borderColor: "#1E3A54", flexDirection: "row", alignItems: "center" },
-  scoreSubtitle: { fontSize: 10, color: "#7A9BB5", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.5 },
+  scoreCard: { borderRadius: 14, padding: 16, borderWidth: 1, borderColor: "#1E3044", flexDirection: "row", alignItems: "center" },
+  scoreSubtitle: { fontSize: 10, color: "#7A95AD", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.5 },
   scoreNum: { fontSize: 48, fontFamily: "Inter_700Bold", lineHeight: 52 },
-  scoreMax: { fontSize: 18, color: "#7A9BB5", fontFamily: "Inter_400Regular" },
-  docType: { fontSize: 11, color: "#7A9BB5", fontFamily: "Inter_400Regular" },
+  scoreMax: { fontSize: 18, color: "#7A95AD", fontFamily: "Inter_400Regular" },
+  docType: { fontSize: 11, color: "#7A95AD", fontFamily: "Inter_400Regular" },
   gradeBadge: { width: 72, height: 72, borderRadius: 16, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   gradeText: { fontSize: 40, fontFamily: "Inter_700Bold" },
 
   metricsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  metricTile: { width: "47%", flexGrow: 1, borderRadius: 14, borderWidth: 1, borderColor: "#1E3A54", padding: 14, alignItems: "center", gap: 6 },
-  metricLabel: { fontSize: 9, color: "#7A9BB5", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.4, textAlign: "center" },
+  metricTile: { width: "47%", flexGrow: 1, borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", padding: 14, alignItems: "center", gap: 6 },
+  metricLabel: { fontSize: 9, color: "#7A95AD", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.4, textAlign: "center" },
   metricValue: { fontSize: 18, fontFamily: "Inter_700Bold" },
 
   flagRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 6 },

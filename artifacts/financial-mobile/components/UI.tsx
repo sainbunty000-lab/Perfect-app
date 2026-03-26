@@ -85,12 +85,12 @@ const navStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#0F1B2A",
+    backgroundColor: "#0D1520",
     borderWidth: 1,
-    borderColor: "#1E3A54",
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    borderColor: "#1E3044",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     marginTop: 6,
   },
   btn: {
@@ -105,7 +105,7 @@ const navStyles = StyleSheet.create({
   dots: { flexDirection: "row", gap: 6, alignItems: "center" },
   dot: {
     width: 6, height: 6, borderRadius: 3,
-    backgroundColor: "#1E3A54",
+    backgroundColor: "#1E3044",
   },
   dotActive: { width: 18, borderRadius: 4, backgroundColor: C.accent },
   dotDone: { backgroundColor: C.primary + "88" },
@@ -115,7 +115,7 @@ const navStyles = StyleSheet.create({
 export function PageBackground({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
   return (
     <LinearGradient
-      colors={["#0A1628", "#0D1B2A", "#111F30"]}
+      colors={["#080F1E", "#0B1426", "#0F1A2B"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[{ flex: 1 }, style]}
@@ -147,14 +147,14 @@ export function PageHeader({
 
 const hStyles = StyleSheet.create({
   wrapper: {
-    borderRadius: 20, overflow: "hidden", padding: 20,
-    borderWidth: 1, borderColor: "#1E3048",
-    backgroundColor: "#131F30", marginBottom: 2,
+    borderRadius: 16, overflow: "hidden", padding: 14,
+    borderWidth: 1, borderColor: "#1C2D40",
+    backgroundColor: "#111C2A", marginBottom: 2,
   },
-  accent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 4 },
-  brand: { fontSize: 9, fontFamily: "Inter_700Bold", color: C.primary, letterSpacing: 2.5, marginBottom: 6, textTransform: "uppercase" },
-  title: { fontSize: 28, fontFamily: "Inter_700Bold", color: "#E8F4FF", letterSpacing: -0.3 },
-  subtitle: { fontSize: 13, color: C.textSecondary, marginTop: 4, fontFamily: "Inter_400Regular" },
+  accent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3 },
+  brand: { fontSize: 8, fontFamily: "Inter_700Bold", color: C.primary, letterSpacing: 2, marginBottom: 4, textTransform: "uppercase" },
+  title: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#E5ECF5", letterSpacing: -0.3 },
+  subtitle: { fontSize: 11, color: C.textSecondary, marginTop: 3, fontFamily: "Inter_400Regular" },
 });
 
 // ── Glass card ─────────────────────────────────────────────────────────────────
@@ -163,7 +163,7 @@ export function GlassCard({ children, accentColor, style }: {
 }) {
   return (
     <LinearGradient
-      colors={["#1A2C42", "#152236"]}
+      colors={["#15202F", "#121B28"]}
       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
       style={[gStyles.card, style]}
     >
@@ -174,8 +174,8 @@ export function GlassCard({ children, accentColor, style }: {
 }
 
 const gStyles = StyleSheet.create({
-  card: { borderRadius: 20, borderWidth: 1, borderColor: "#1E3A54", overflow: "hidden", padding: 18 },
-  bar: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 },
+  card: { borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", overflow: "hidden", padding: 14 },
+  bar: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3, borderTopLeftRadius: 14, borderBottomLeftRadius: 14 },
 });
 
 // ── Upload zone (dashed) ───────────────────────────────────────────────────────
@@ -266,16 +266,16 @@ export function UploadZone({
 }
 
 const uStyles = StyleSheet.create({
-  wrapper: { gap: 8 },
-  zone: { borderRadius: 16, borderWidth: 1.5, overflow: "hidden", paddingHorizontal: 16, paddingVertical: 14 },
-  row: { flexDirection: "row", alignItems: "center", gap: 12 },
-  iconBox: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  label: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium" },
-  parseBtn: { borderRadius: 14, overflow: "hidden" },
-  parseBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, paddingHorizontal: 20 },
-  parseBtnText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#000" },
-  doneChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#10B98115", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  doneText: { fontSize: 11, color: "#10B981", fontFamily: "Inter_500Medium" },
+  wrapper: { gap: 6 },
+  zone: { borderRadius: 12, borderWidth: 1.5, overflow: "hidden", paddingHorizontal: 12, paddingVertical: 10 },
+  row: { flexDirection: "row", alignItems: "center", gap: 10 },
+  iconBox: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  label: { flex: 1, fontSize: 12, fontFamily: "Inter_500Medium" },
+  parseBtn: { borderRadius: 12, overflow: "hidden" },
+  parseBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 11, paddingHorizontal: 16 },
+  parseBtnText: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#000" },
+  doneChip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#2D8B5F15", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5 },
+  doneText: { fontSize: 10, color: "#2D8B5F", fontFamily: "Inter_500Medium" },
 });
 
 // ── Gradient button ────────────────────────────────────────────────────────────
@@ -301,8 +301,8 @@ export function GradientButton({
 }
 
 const bStyles = StyleSheet.create({
-  btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 16, paddingVertical: 16 },
-  label: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 13 },
+  label: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
 });
 
 // ── KPI metric tile ────────────────────────────────────────────────────────────
@@ -316,9 +316,9 @@ export function MetricTile({ label, value, color }: { label: string; value: stri
 }
 
 const mStyles = StyleSheet.create({
-  tile: { flex: 1, minWidth: "29%", borderRadius: 16, borderWidth: 1, borderColor: "#1E3A54", padding: 14, alignItems: "center", gap: 6 },
-  label: { fontSize: 9, color: C.textSecondary, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.6, textAlign: "center" },
-  value: { fontSize: 17, fontFamily: "Inter_700Bold", textAlign: "center" },
+  tile: { flex: 1, minWidth: "29%", borderRadius: 12, borderWidth: 1, borderColor: "#1E3044", padding: 10, alignItems: "center", gap: 4 },
+  label: { fontSize: 8, color: C.textSecondary, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center" },
+  value: { fontSize: 14, fontFamily: "Inter_700Bold", textAlign: "center" },
 });
 
 // ── Section card title ─────────────────────────────────────────────────────────
@@ -326,7 +326,7 @@ export const CardTitle = ({ children, style }: { children: string; style?: TextS
   <Text style={[ctStyles.t, style]}>{children}</Text>
 );
 const ctStyles = StyleSheet.create({
-  t: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#C8DDF0", marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.5 },
+  t: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#B8CCE0", marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 },
 });
 
 export { default as Colors } from "@/constants/colors";

@@ -14,94 +14,81 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: "#3D5A74",
+        tabBarInactiveTintColor: "#3D5468",
         headerShown: false,
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: isIOS ? "transparent" : "#0A1628",
+          backgroundColor: isIOS ? "transparent" : "#080F1E",
           borderTopWidth: 1,
-          borderTopColor: "#1E3A54",
+          borderTopColor: "#1E3044",
           elevation: 0,
-          height: 56,
+          height: 52,
         },
-        tabBarLabelStyle: { fontSize: 8.5, fontFamily: "Inter_500Medium", marginBottom: 4 },
+        tabBarLabelStyle: { fontSize: 8, fontFamily: "Inter_500Medium", marginBottom: 4 },
         tabBarBackground: () =>
           isIOS ? (
             <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
           ) : (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: "#0A1628" }]} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: "#080F1E" }]} />
           ),
       }}
     >
-      {/* 1. Home — Welcome & Navigation Hub */}
       <Tabs.Screen
         name="home"
         options={{
           title: "Home",
           tabBarActiveTintColor: C.primary,
-          tabBarIcon: ({ color }) => <Feather name="home" size={19} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="home" size={18} color={color} />,
         }}
       />
-
-      {/* 2. Dashboard — Analytics & KPIs */}
       <Tabs.Screen
         name="dashboard"
         options={{
           title: "Dashboard",
-          tabBarActiveTintColor: "#20B2AA",
-          tabBarIcon: ({ color }) => <Feather name="activity" size={19} color={color} />,
+          tabBarActiveTintColor: C.primary,
+          tabBarIcon: ({ color }) => <Feather name="activity" size={18} color={color} />,
         }}
       />
-
-      {/* 3. Working Capital */}
       <Tabs.Screen
         name="index"
         options={{
           title: "WC",
-          tabBarActiveTintColor: "#4A9EFF",
-          tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={19} color={color} />,
+          tabBarActiveTintColor: C.secondary,
+          tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={18} color={color} />,
         }}
       />
-
-      {/* 4. Banking */}
       <Tabs.Screen
         name="banking"
         options={{
           title: "Banking",
-          tabBarActiveTintColor: "#D4A800",
+          tabBarActiveTintColor: C.accent,
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="bank-outline" size={19} color={color} />
+            <MaterialCommunityIcons name="bank-outline" size={18} color={color} />
           ),
         }}
       />
-
-      {/* 5. Multi-Year Analysis */}
       <Tabs.Screen
         name="multiyear"
         options={{
           title: "Trend",
-          tabBarActiveTintColor: "#10B981",
-          tabBarIcon: ({ color }) => <Feather name="trending-up" size={19} color={color} />,
+          tabBarActiveTintColor: C.success,
+          tabBarIcon: ({ color }) => <Feather name="trending-up" size={18} color={color} />,
         }}
       />
-
-      {/* 6. GST & ITR */}
       <Tabs.Screen
         name="gst-itr"
         options={{
           title: "GST",
-          tabBarActiveTintColor: "#A855F7",
-          tabBarIcon: ({ color }) => <Feather name="file-text" size={19} color={color} />,
+          tabBarActiveTintColor: "#8B6CC1",
+          tabBarIcon: ({ color }) => <Feather name="file-text" size={18} color={color} />,
         }}
       />
-
-      {/* 7. Saved Cases */}
       <Tabs.Screen
         name="saved"
         options={{
           title: "Cases",
-          tabBarActiveTintColor: "#F5832A",
-          tabBarIcon: ({ color }) => <Feather name="folder" size={19} color={color} />,
+          tabBarActiveTintColor: "#C47A3A",
+          tabBarIcon: ({ color }) => <Feather name="folder" size={18} color={color} />,
         }}
       />
     </Tabs>
