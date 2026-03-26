@@ -1,0 +1,106 @@
+{
+  "id": "a4b23e91-766f-4603-90a3-ec87cc21e0c7",
+  "createdAt": "2026-03-26T19:01:13.438Z",
+  "runtimeVersion": "exposdk:54.0.0",
+  "launchAsset": {
+    "key": "bundle-1774551673438-2774",
+    "contentType": "application/javascript",
+    "url": "https://perfect-app-production.up.railway.app/1774551673438-2774/_expo/static/js/android/bundle.js"
+  },
+  "assets": [],
+  "metadata": {},
+  "extra": {
+    "eas": {},
+    "expoClient": {
+      "name": "Dhanush Financial",
+      "slug": "dhanush-financial",
+      "version": "1.0.0",
+      "orientation": "portrait",
+      "icon": "./assets/images/icon.png",
+      "scheme": "dhanush-financial",
+      "userInterfaceStyle": "dark",
+      "newArchEnabled": true,
+      "splash": {
+        "image": "./assets/images/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#0A1628",
+        "imageUrl": "http://127.0.0.1:8091/assets/./assets/images/splash-icon.png"
+      },
+      "ios": {
+        "supportsTablet": false,
+        "bundleIdentifier": "com.dhanushenterprises.financial"
+      },
+      "android": {
+        "adaptiveIcon": {
+          "foregroundImage": "./assets/images/adaptive-icon.png",
+          "backgroundColor": "#0A1628",
+          "foregroundImageUrl": "http://127.0.0.1:8091/assets/./assets/images/adaptive-icon.png"
+        },
+        "package": "com.dhanushenterprises.financial",
+        "permissions": [
+          "CAMERA",
+          "READ_EXTERNAL_STORAGE"
+        ]
+      },
+      "web": {
+        "favicon": "./assets/images/icon.png"
+      },
+      "plugins": [
+        [
+          "expo-router",
+          {
+            "origin": "https://replit.com/"
+          }
+        ],
+        "expo-font",
+        "expo-web-browser"
+      ],
+      "experiments": {
+        "typedRoutes": true,
+        "reactCompiler": true
+      },
+      "_internal": {
+        "isDebug": false,
+        "projectRoot": "/home/runner/workspace/artifacts/financial-mobile",
+        "dynamicConfigPath": {},
+        "staticConfigPath": "/home/runner/workspace/artifacts/financial-mobile/app.json",
+        "packageJsonPath": "/home/runner/workspace/artifacts/financial-mobile/package.json",
+        "pluginHistory": {
+          "expo-font": {
+            "name": "expo-font",
+            "version": "14.0.11"
+          },
+          "expo-web-browser": {
+            "name": "expo-web-browser",
+            "version": "15.0.10"
+          }
+        }
+      },
+      "sdkVersion": "54.0.0",
+      "platforms": [
+        "ios",
+        "android",
+        "web"
+      ],
+      "extra": {
+        "router": {
+          "origin": "https://replit.com/"
+        }
+      },
+      "iconUrl": "http://127.0.0.1:8091/assets/./assets/images/icon.png",
+      "hostUri": "eda86e88-0776-4c03-b810-99031421d353-00-2ekwkfd492e3b.spock.replit.dev/android"
+    },
+    "expoGo": {
+      "debuggerHost": "eda86e88-0776-4c03-b810-99031421d353-00-2ekwkfd492e3b.spock.replit.dev/android",
+      "developer": {
+        "tool": "expo-cli",
+        "projectRoot": "/home/runner/workspace/artifacts/financial-mobile"
+      },
+      "packagerOpts": {
+        "dev": false
+      },
+      "mainModuleName": "node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__abd38177f532ddff11e5834956475527/node_modules/expo-router/entry"
+    },
+    "scopeKey": "@anonymous/dhanush-financial-7ab8b620-4a7c-494b-bd52-2acecc8731f6"
+  }
+}
