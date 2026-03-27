@@ -1,11 +1,11 @@
 {
-  "id": "a4b23e91-766f-4603-90a3-ec87cc21e0c7",
-  "createdAt": "2026-03-26T19:01:13.438Z",
+  "id": "77114845-c25d-4674-83de-fe3b1a913cb8",
+  "createdAt": "2026-03-27T08:32:41.844Z",
   "runtimeVersion": "exposdk:54.0.0",
   "launchAsset": {
-    "key": "bundle-1774551673438-2774",
+    "key": "bundle-1774600361844-1574",
     "contentType": "application/javascript",
-    "url": "https://perfect-app-production.up.railway.app/1774551673438-2774/_expo/static/js/android/bundle.js"
+    "url": "https://perfect-app-production-8126.up.railway.app/1774600361844-1574/_expo/static/js/android/bundle.js"
   },
   "assets": [],
   "metadata": {},
@@ -101,6 +101,6 @@
       },
       "mainModuleName": "node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__abd38177f532ddff11e5834956475527/node_modules/expo-router/entry"
     },
-    "scopeKey": "@anonymous/dhanush-financial-7ab8b620-4a7c-494b-bd52-2acecc8731f6"
+    "scopeKey": "@anonymous/dhanush-financial-21f898d4-3b13-4a4a-bae3-8017596f37e3"
   }
 }
