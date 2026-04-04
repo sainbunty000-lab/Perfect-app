@@ -267,14 +267,34 @@ export default function MultiYearScreen() {
           accentColor={GREEN}
         />
 
-        {/* ── How to use hint ─────────────────────────────────────── */}
-        <LinearGradient colors={[GREEN + "14", GREEN + "06"]} style={styles.howToCard}>
-          <Feather name="info" size={14} color={GREEN} />
-          <Text style={styles.howToText}>
-            Expand each year below → Upload documents → Tap{" "}
-            <Text style={{ color: GREEN, fontFamily: "Inter_600SemiBold" }}>Generate Trend Analysis</Text>
+        {/* ── Upload Documents Section ──────────────────────────── */}
+        <GlassCard accentColor={GREEN}>
+          <CardTitle>Upload Financial Documents</CardTitle>
+          <Text style={styles.uploadHint}>
+            Upload Balance Sheet and P&L statements for each financial year below.
+            Supports: PDF · Excel · CSV · Image (scanned)
           </Text>
-        </LinearGradient>
+          <View style={styles.uploadSteps}>
+            <View style={styles.uploadStep}>
+              <View style={[styles.stepBadge, { backgroundColor: GREEN + "22" }]}>
+                <Text style={[styles.stepNum, { color: GREEN }]}>1</Text>
+              </View>
+              <Text style={styles.stepText}>Expand a year slot and tap "Select" to pick a file</Text>
+            </View>
+            <View style={styles.uploadStep}>
+              <View style={[styles.stepBadge, { backgroundColor: TEAL + "22" }]}>
+                <Text style={[styles.stepNum, { color: TEAL }]}>2</Text>
+              </View>
+              <Text style={styles.stepText}>Tap "Extract Data" to auto-fill values from the document</Text>
+            </View>
+            <View style={styles.uploadStep}>
+              <View style={[styles.stepBadge, { backgroundColor: AMBER + "22" }]}>
+                <Text style={[styles.stepNum, { color: AMBER }]}>3</Text>
+              </View>
+              <Text style={styles.stepText}>Repeat for all years, then tap "Generate Trend Analysis"</Text>
+            </View>
+          </View>
+        </GlassCard>
 
         {/* ── Year slots ──────────────────────────────────────────── */}
         {slots.map((slot, i) => (
@@ -379,6 +399,21 @@ export default function MultiYearScreen() {
           icon="bar-chart-2"
           colors={[GREEN, "#059669"]}
         />
+
+        {/* ── Charts placeholder when not yet analyzed ─────────── */}
+        {!analyzed && (
+          <GlassCard accentColor={GREEN}>
+            <View style={styles.chartsPlaceholder}>
+              <Feather name="bar-chart-2" size={32} color={GREEN + "66"} />
+              <Text style={styles.chartsPlaceholderTitle}>Charts & Trends</Text>
+              <Text style={styles.chartsPlaceholderText}>
+                Revenue trend, working capital, current ratio charts and a full
+                year-over-year summary will appear here after you upload
+                documents and tap Generate Trend Analysis.
+              </Text>
+            </View>
+          </GlassCard>
+        )}
 
         {/* ── RESULTS ───────────────────────────────────────────── */}
         {analyzed && (
@@ -527,7 +562,7 @@ export default function MultiYearScreen() {
               style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: "#243448", backgroundColor: "#0C1826", marginTop: 4 }}
               onPress={() => {
                 setSlots(DEFAULT_LABELS.map(emptySlot));
-                setActiveSlot(0); setShowResults(false);
+                setExpanded([true, false, false]); setAnalyzed(false);
                 setClientName(""); setSaveModal(false);
               }}
               activeOpacity={0.8}
@@ -704,8 +739,16 @@ function TableRow({ label, vals, format }: { label: string; vals: (number | unde
 const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 16, gap: 12 },
 
-  howToCard: { flexDirection: "row", alignItems: "flex-start", gap: 10, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#2D8B5F33" },
-  howToText: { flex: 1, fontSize: 12, color: "#7A95AD", fontFamily: "Inter_400Regular", lineHeight: 18 },
+  uploadHint: { fontSize: 11, color: "#7A95AD", fontFamily: "Inter_400Regular", lineHeight: 17, marginBottom: 12 },
+  uploadSteps: { gap: 10 },
+  uploadStep: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  stepBadge: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 },
+  stepNum: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  stepText: { flex: 1, fontSize: 12, color: "#9BBDD4", fontFamily: "Inter_400Regular", lineHeight: 18 },
+
+  chartsPlaceholder: { alignItems: "center", paddingVertical: 16, gap: 10 },
+  chartsPlaceholderTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#5A8A7A" },
+  chartsPlaceholderText: { fontSize: 11, color: "#4A6A7A", fontFamily: "Inter_400Regular", lineHeight: 17, textAlign: "center" },
 
   yearCard: { borderRadius: 14, borderWidth: 1, borderColor: "#1E3044", overflow: "hidden" },
   yearHeader: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16 },
